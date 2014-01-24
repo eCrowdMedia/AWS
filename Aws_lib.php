@@ -8,9 +8,6 @@
  * @author      Willy
  * @link        https://readmoo.com
  */
-
-Namespace Ecrowdmedia\Aws;
-
 use Aws\Common\Aws;
 use Aws\Common\Enum\Region;
 use Aws\S3\Enum\CannedAcl;
