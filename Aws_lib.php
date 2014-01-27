@@ -26,13 +26,15 @@ class Aws_lib {
 	private $cfIdentity;
 	public $debug = FALSE;
 
-	function __construct()
+	function __construct($config = array())
 	{
-		$this->aws = Aws::factory(
-			is_readable(APPPATH . 'config/' . ENVIRONMENT . '/aws_lib.php') ?
-			APPPATH . 'config/' . ENVIRONMENT . '/aws_lib.php' :
-			APPPATH . 'config/aws_lib.php'
-		);
+		if (empty($config))
+		{
+			$CI =& get_instance();
+			$CI->config->load('aws', TRUE);
+			$config = $CI->config->item('aws_config', 'aws');
+		}
+		$this->aws = Aws::factory($config);
 		$this->s3Client = $this->aws->get('S3');
 		$this->cfClient = $this->aws->get('CloudFront');
 		$this->sqsClient = $this->aws->get('Sqs');
