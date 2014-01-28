@@ -262,6 +262,21 @@ class Aws_lib {
 		}
 	}
 
+	/**
+	 * @method int deleteMatchingObjects($bucket, $prefix = '', $regex = '', array $options = array()) {@command S3 DeleteMatchingObjects}
+	 */
+	public function deleteMatchingObjects($bucket_name, $prefix = '', $regex = '', array $options = array())
+	{
+		try
+		{
+			return $this->s3Client->deleteMatchingObjects($bucket_name, $prefix, $regex, $options);
+		}
+		catch (RuntimeException $e)
+		{
+			return $this->debug ? $e->getMessage() : FALSE;
+		}
+	}
+
 	public function registerStreamWrapper()
 	{
 		return $this->s3Client->registerStreamWrapper();
