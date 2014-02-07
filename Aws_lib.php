@@ -11,6 +11,7 @@
 use Aws\Common\Aws;
 use Aws\Common\Enum\Region;
 use Aws\S3\Enum\CannedAcl;
+use Aws\S3\Enum\StorageClass;
 use Aws\S3\Exception\S3Exception;
 use Aws\CloudFront\Enum\OriginProtocolPolicy;
 use Aws\CloudFront\Enum\ViewerProtocolPolicy;
@@ -207,16 +208,29 @@ class Aws_lib {
 	/**
 	 * @method Model putObject(array $args = array()) {@command S3 PutObject}
 	 */
-	public function putObject($bucket_name, $key, $body)
+	public function putObject($bucket_name, $key, $source, array $options = array())
 	{
 		try
 		{
-			return $this->s3Client->putObject(array(
+			if (empty($options['ACL']))
+				$options['ACL'] = strpos($bucket_name, 'readmoo-cf-') === 0 ?
+					CannedAcl::PUBLIC_READ :
+					CannedAcl::PRIVATE_ACCESS;
+			if (empty($options['StorageClass']))
+				$options['StorageClass'] = strpos($bucket_name, 'readmoo-cf-') === 0 ?
+					StorageClass::REDUCED_REDUNDANCY :
+					StorageClass::STANDARD;
+			$options = array(
 				'Bucket' => $bucket_name,
-				'Key' => $key,
-				'Body' => $body,
-				'ACL' => CannedAcl::PUBLIC_READ
-			));
+				'Key' => $key
+			) + $options;
+			if (empty($options['SourceFile']) && empty($options['Body'])) $options[is_file($source) ? 'SourceFile' : 'Body'] = $source;
+			if (isset($options['SourceFile']) && empty($options['ContentType']))
+			{
+				$finfo = finfo_open(FILEINFO_MIME_TYPE);
+				$options['ContentType'] = finfo_file($finfo, $options['SourceFile']);
+			}
+			return $this->s3Client->putObject($options);
 		}
 		catch (S3Exception $e)
 		{
@@ -281,64 +295,6 @@ class Aws_lib {
 	{
 		return $this->s3Client->registerStreamWrapper();
 	}
-/**
- * Client to interact with Amazon Simple Storage Service
- *
- * @method \Aws\S3\S3SignatureInterface getSignature()
- * @method Model abortMultipartUpload(array $args = array()) {@command S3 AbortMultipartUpload}
- * @method Model completeMultipartUpload(array $args = array()) {@command S3 CompleteMultipartUpload}
- * @method Model copyObject(array $args = array()) {@command S3 CopyObject}
- * @method Model createMultipartUpload(array $args = array()) {@command S3 CreateMultipartUpload}
- * @method Model deleteBucket(array $args = array()) {@command S3 DeleteBucket}
- * @method Model deleteBucketCors(array $args = array()) {@command S3 DeleteBucketCors}
- * @method Model deleteBucketLifecycle(array $args = array()) {@command S3 DeleteBucketLifecycle}
- * @method Model deleteBucketPolicy(array $args = array()) {@command S3 DeleteBucketPolicy}
- * @method Model deleteBucketTagging(array $args = array()) {@command S3 DeleteBucketTagging}
- * @method Model deleteBucketWebsite(array $args = array()) {@command S3 DeleteBucketWebsite}
- * @method Model getBucketAcl(array $args = array()) {@command S3 GetBucketAcl}
- * @method Model getBucketCors(array $args = array()) {@command S3 GetBucketCors}
- * @method Model getBucketLifecycle(array $args = array()) {@command S3 GetBucketLifecycle}
- * @method Model getBucketLocation(array $args = array()) {@command S3 GetBucketLocation}
- * @method Model getBucketLogging(array $args = array()) {@command S3 GetBucketLogging}
- * @method Model getBucketNotification(array $args = array()) {@command S3 GetBucketNotification}
- * @method Model getBucketPolicy(array $args = array()) {@command S3 GetBucketPolicy}
- * @method Model getBucketRequestPayment(array $args = array()) {@command S3 GetBucketRequestPayment}
- * @method Model getBucketTagging(array $args = array()) {@command S3 GetBucketTagging}
- * @method Model getBucketVersioning(array $args = array()) {@command S3 GetBucketVersioning}
- * @method Model getBucketWebsite(array $args = array()) {@command S3 GetBucketWebsite}
- * @method Model getObject(array $args = array()) {@command S3 GetObject}
- * @method Model getObjectAcl(array $args = array()) {@command S3 GetObjectAcl}
- * @method Model getObjectTorrent(array $args = array()) {@command S3 GetObjectTorrent}
- * @method Model listBuckets(array $args = array()) {@command S3 ListBuckets}
- * @method Model listMultipartUploads(array $args = array()) {@command S3 ListMultipartUploads}
- * @method Model listObjectVersions(array $args = array()) {@command S3 ListObjectVersions}
- * @method Model listObjects(array $args = array()) {@command S3 ListObjects}
- * @method Model listParts(array $args = array()) {@command S3 ListParts}
- * @method Model putBucketAcl(array $args = array()) {@command S3 PutBucketAcl}
- * @method Model putBucketCors(array $args = array()) {@command S3 PutBucketCors}
- * @method Model putBucketLifecycle(array $args = array()) {@command S3 PutBucketLifecycle}
- * @method Model putBucketLogging(array $args = array()) {@command S3 PutBucketLogging}
- * @method Model putBucketNotification(array $args = array()) {@command S3 PutBucketNotification}
- * @method Model putBucketRequestPayment(array $args = array()) {@command S3 PutBucketRequestPayment}
- * @method Model putBucketTagging(array $args = array()) {@command S3 PutBucketTagging}
- * @method Model putBucketVersioning(array $args = array()) {@command S3 PutBucketVersioning}
- * @method Model putBucketWebsite(array $args = array()) {@command S3 PutBucketWebsite}
- * @method Model putObjectAcl(array $args = array()) {@command S3 PutObjectAcl}
- * @method Model restoreObject(array $args = array()) {@command S3 RestoreObject}
- * @method Model uploadPart(array $args = array()) {@command S3 UploadPart}
- * @method Model uploadPartCopy(array $args = array()) {@command S3 UploadPartCopy}
- * @method waitUntilBucketExists(array $input) Wait until a bucket exists. The input array uses the parameters of the HeadBucket operation and waiter specific settings
- * @method waitUntilBucketNotExists(array $input) Wait until a bucket does not exist. The input array uses the parameters of the HeadBucket operation and waiter specific settings
- * @method waitUntilObjectExists(array $input) Wait until an object exists. The input array uses the parameters of the HeadObject operation and waiter specific settings
- * @method ResourceIteratorInterface getListBucketsIterator(array $args = array()) The input array uses the parameters of the ListBuckets operation
- * @method ResourceIteratorInterface getListMultipartUploadsIterator(array $args = array()) The input array uses the parameters of the ListMultipartUploads operation
- * @method ResourceIteratorInterface getListObjectsIterator(array $args = array()) The input array uses the parameters of the ListObjects operation
- * @method ResourceIteratorInterface getListObjectVersionsIterator(array $args = array()) The input array uses the parameters of the ListObjectVersions operation
- * @method ResourceIteratorInterface getListPartsIterator(array $args = array()) The input array uses the parameters of the ListParts operation
- *
- * @link http://docs.aws.amazon.com/aws-sdk-php/guide/latest/service-s3.html User guide
- * @link http://docs.aws.amazon.com/aws-sdk-php/latest/class-Aws.S3.S3Client.html API docs
- */
 
 	public function createDistribution($bucket_name, $domain_name)
 	{
