@@ -434,6 +434,29 @@ class Aws_lib {
 
 	/**
 	 *
+	 * @method Model getQueueUrl(array $args = array()) {@command Sqs GetQueueUrl}
+	 */
+	public function getQueueUrl($queueName, $queueOwnerAWSAccountId = FALSE)
+	{
+		try
+		{
+			$args = array(
+				'QueueName' => $queueName
+			);
+			if ( ! empty($queueOwnerAWSAccountId)) {
+				$args['QueueOwnerAWSAccountId'] = $queueOwnerAWSAccountId;
+			}
+			$result = $this->sqsClient->getQueueUrl($args);
+			return $result->get('QueueUrl');
+		}
+		catch (SqsException $e)
+		{
+			return $this->debug ? $e->getMessage() : FALSE;
+		}
+	}
+
+	/**
+	 *
 	 * @method Model listQueues(array $args = array()) {@command Sqs ListQueues}
 	 */
 	public function listQueues($queueNamePrefix = FALSE)
@@ -598,7 +621,6 @@ class Aws_lib {
 	 * @method Model changeMessageVisibilityBatch(array $args = array()) {@command Sqs ChangeMessageVisibilityBatch}
 	 * @method Model deleteQueue(array $args = array()) {@command Sqs DeleteQueue}
 	 * @method Model getQueueAttributes(array $args = array()) {@command Sqs GetQueueAttributes}
-	 * @method Model getQueueUrl(array $args = array()) {@command Sqs GetQueueUrl}
 	 * @method Model removePermission(array $args = array()) {@command Sqs RemovePermission}
 	 * @method Model setQueueAttributes(array $args = array()) {@command Sqs SetQueueAttributes}
 	 * @method ResourceIteratorInterface getListQueuesIterator(array $args = array()) The input array uses the parameters of the ListQueues operation
