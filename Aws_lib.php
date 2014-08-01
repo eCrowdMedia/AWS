@@ -421,7 +421,9 @@ class Aws_lib {
 	{
 		try
 		{
-			$params = array('QueueName' => ENVIRONMENT . '_' . $queueName);
+			$params = array(
+				'QueueName' => ENVIRONMENT . '_' . $queueName
+			);
 			if (is_array($attributes)) $params['Attributes'] = $attributes;
 			$result = $this->sqsClient->createQueue($params);
 			return $result->get('QueueUrl');
@@ -440,13 +442,13 @@ class Aws_lib {
 	{
 		try
 		{
-			$args = array(
-				'QueueName' => $queueName
+			$params = array(
+				'QueueName' => ENVIRONMENT . '_' . $queueName
 			);
 			if ( ! empty($queueOwnerAWSAccountId)) {
-				$args['QueueOwnerAWSAccountId'] = $queueOwnerAWSAccountId;
+				$params['QueueOwnerAWSAccountId'] = $queueOwnerAWSAccountId;
 			}
-			$result = $this->sqsClient->getQueueUrl($args);
+			$result = $this->sqsClient->getQueueUrl($params);
 			return $result->get('QueueUrl');
 		}
 		catch (SqsException $e)
@@ -463,7 +465,11 @@ class Aws_lib {
 	{
 		try
 		{
-			$result = $this->sqsClient->listQueues(empty($queueNamePrefix) ? array() : array('QueueNamePrefix' => ENVIRONMENT . '_' . $queueNamePrefix));
+			$result = $this->sqsClient->listQueues(
+				empty($queueNamePrefix) ?
+					array() :
+					array('QueueNamePrefix' => ENVIRONMENT . '_' . $queueNamePrefix)
+			);
 			return $result->get('QueueUrls');
 		}
 		catch (SqsException $e)
