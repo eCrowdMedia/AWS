@@ -118,8 +118,13 @@ class Aws_util {
 
 	public function s3_sync($source, $target, $options = false)
 	{
-		if ( ! file_exists($source) OR
-			strpos($target, 's3://') !== 0) {
+		$s3_protocol = 's3://';
+		if (strpos($source, $s3_protocol) !== 0) {
+			if ( ! file_exists($source)) {
+				return false;
+			}
+		}
+		elseif ( ! file_exists($target)) {
 			return false;
 		}
 		$args = array();
