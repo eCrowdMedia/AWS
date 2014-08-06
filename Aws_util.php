@@ -169,7 +169,7 @@ class Aws_util {
 				}
 			}
 		}
-		// Check is exist
+
 		$cmd = sprintf(
 			'%s %s %s "%s" %s',
 			$this->config->item('cmd_s3cmd', 'cmd'),
@@ -178,7 +178,67 @@ class Aws_util {
 			$source,
 			$target
 		);
-		return $this->_execute($cmd);
+		$this->load->add_package_path(config_item('common_package'));
+		$this->load->library('process_lib');
+		$this->load->remove_package_path(config_item('common_package'));
+		return $this->process_lib->execute($cmd);
+	}
+
+	public function s3_del($pathname)
+	{
+		if (empty($pathname) OR strpos($pathname, 's3://') !== 0) {
+			return false;
+		}
+		$this->load->add_package_path(config_item('common_package'));
+		$this->load->library('process_lib');
+		$this->load->remove_package_path(config_item('common_package'));
+		return $this->process_lib->execute($cmd);
+	}
+
+	public function s3_key(array $params, $mode = 'ebook')
+	{
+		$segments = array(
+			's3://readmoo-' . ENVIRONMENT,
+			$mode
+		);
+		switch ($mode) {
+			case 'ebook':
+				// file
+				if (isset($params['file'])) {
+					$file = $params['file'];
+					if (empty($file['manifestation_id']) OR
+						empty($file['sn'])) {
+						return false;
+					}
+					$segments[] = $file['manifestation_id'] % 1000;
+					$segments[] = $file['manifestation_id'];
+					$segments[] = $file['sn'];
+					if (empty($file['version']) OR
+						empty($file['setting'])) {
+						break;
+					}
+					$setting = json_decode($file['setting'], true);
+					if (isset($setting['revision'])) {
+						$segments[] = $file['version'] . '_' . $file['revision'];
+					}
+				}
+				// manifestataion
+				elseif (isset($params['manifestation'])) {
+					if (empty($params['manifestation']['sn'])) {
+						return false;
+					}
+					$segments[] = $params['manifestation']['sn'] % 1000;
+					$segments[] = $params['manifestation']['sn'];
+				}
+				break;
+
+			case 'cover':
+			case 'avatar':
+			default:
+				return false;
+				break;
+		}
+		return implode('/', $segments) . '/';
 	}
 }
 // END Aws_util Class
