@@ -115,6 +115,71 @@ class Aws_util {
 		$this->_tasks = array();
 		return $this;
 	}
+
+	public function s3_sync($source, $target, $options = false)
+	{
+		if ( ! file_exists($source) OR
+			strpos($target, 's3://') !== 0) {
+			return false;
+		}
+		$args = array();
+		$mode = 'sync';
+		if (is_array($options)) {
+			foreach ($options as $key => $value) {
+				switch (strtolower($key)) {
+					case 'mode':
+						if (in_array($value, array('sync', 'get', 'put'))) {
+							$mode = $value;
+						}
+						break;
+
+					case 'recursive':
+						if ($value) {
+							$args[] = '-r';
+						}
+						break;
+
+					case 'reducedredundancy':
+						if ($value) {
+							$args[] = '--rr';
+						}
+						break;
+
+					case 'public':
+						if ($value) {
+							$args[] = '-P';
+						}
+						break;
+
+					case 'force':
+						if ($value) {
+							$args[] = '-f';
+						}
+						break;
+
+					case 'delete':
+						if ($value) {
+							$args[] = '--delete-removed';
+						}
+						break;
+
+					default:
+						# code...
+						break;
+				}
+			}
+		}
+		// Check is exist
+		$cmd = sprintf(
+			'%s %s %s "%s" %s',
+			$this->config->item('cmd_s3cmd', 'cmd'),
+			$mode,
+			implode(' ', $args),
+			$source,
+			$target
+		);
+		return $this->_execute($cmd);
+	}
 }
 // END Aws_util Class
 
