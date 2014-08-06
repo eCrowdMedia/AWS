@@ -119,14 +119,6 @@ class Aws_util {
 	public function s3_sync($source, $target, $options = false)
 	{
 		$s3_protocol = 's3://';
-		if (strpos($source, $s3_protocol) !== 0) {
-			if ( ! file_exists($source)) {
-				return false;
-			}
-		}
-		elseif ( ! file_exists($target)) {
-			return false;
-		}
 		$args = array();
 		$mode = 'sync';
 		if (is_array($options)) {
@@ -135,6 +127,11 @@ class Aws_util {
 					case 'mode':
 						if (in_array($value, array('sync', 'get', 'put'))) {
 							$mode = $value;
+						}
+						if ($mode == 'put' &&
+							(strpos($source, $s3_protocol) === 0 OR ! file_exists($source))
+						) {
+							return false;
 						}
 						break;
 
@@ -175,29 +172,33 @@ class Aws_util {
 			}
 		}
 
+		$CI =& get_instance();
+		$CI->config->load('cmd', true);
 		$cmd = sprintf(
-			'%s %s %s "%s" %s',
-			$this->config->item('cmd_s3cmd', 'cmd'),
+			'%s %s %s "%s" "%s"',
+			$CI->config->item('cmd_s3cmd', 'cmd'),
 			$mode,
 			implode(' ', $args),
 			$source,
 			$target
 		);
-		$this->load->add_package_path(config_item('common_package'));
-		$this->load->library('process_lib');
-		$this->load->remove_package_path(config_item('common_package'));
-		return $this->process_lib->execute($cmd);
+		$CI->load->add_package_path(config_item('common_package'));
+		$CI->load->library('process_lib');
+		$CI->load->remove_package_path(config_item('common_package'));
+		return $CI->process_lib->execute($cmd);
 	}
 
-	public function s3_del($pathname)
+	public function s3_del($s3_key)
 	{
-		if (empty($pathname) OR strpos($pathname, 's3://') !== 0) {
+		if (empty($s3_key) OR strpos($s3_key, 's3://') !== 0) {
 			return false;
 		}
-		$this->load->add_package_path(config_item('common_package'));
-		$this->load->library('process_lib');
-		$this->load->remove_package_path(config_item('common_package'));
-		return $this->process_lib->execute($cmd);
+		$CI =& get_instance();
+		$CI->config->load('cmd', true);
+		$CI->load->add_package_path(config_item('common_package'));
+		$CI->load->library('process_lib');
+		$CI->load->remove_package_path(config_item('common_package'));
+		return $CI->process_lib->execute($CI->config->item('cmd_s3cmd', 'cmd') . ' del -r ' . $s3_key);
 	}
 
 	public function s3_key(array $params, $mode = 'ebook')
