@@ -31,6 +31,7 @@
 */
 class Aws_util {
 	private $_cli_base = FALSE;
+	private static $_s3_protocol = 's3://';
 
 	function __construct($config = array())
 	{
@@ -118,7 +119,6 @@ class Aws_util {
 
 	public function s3_sync($source, $target, $options = false)
 	{
-		$s3_protocol = 's3://';
 		$args = array();
 		$mode = 'sync';
 		if (is_array($options)) {
@@ -129,7 +129,7 @@ class Aws_util {
 							$mode = $value;
 						}
 						if ($mode == 'put' &&
-							(strpos($source, $s3_protocol) === 0 OR ! file_exists($source))
+							(strpos($source, self::$_s3_protocol) === 0 OR ! file_exists($source))
 						) {
 							return false;
 						}
@@ -190,7 +190,7 @@ class Aws_util {
 
 	public function s3_del($s3_key)
 	{
-		if (empty($s3_key) OR strpos($s3_key, 's3://') !== 0) {
+		if (empty($s3_key) OR strpos($s3_key, self::$_s3_protocol) !== 0) {
 			return false;
 		}
 		$CI =& get_instance();
@@ -201,10 +201,16 @@ class Aws_util {
 		return $CI->process_lib->execute($CI->config->item('cmd_s3cmd', 'cmd') . ' del -r ' . $s3_key);
 	}
 
-	public function s3_key(array $params, $mode = 'ebook')
+	public function s3_key(array $params, $mode = 'ebook', $use_cf = false)
 	{
+		$CI =& get_instance();
+		$CI->config->load('aws', true);
 		$segments = array(
-			's3://readmoo-' . ENVIRONMENT,
+			self::$_s3_protocol . (
+				$use_cf ?
+					$CI->config->item('cf_bucket', 'aws') :
+					$CI->config->item('s3_bucket', 'aws')
+			),
 			$mode
 		);
 		switch ($mode) {
