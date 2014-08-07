@@ -123,6 +123,7 @@ class Aws_util {
 	{
 		$args = array();
 		$mode = 'sync';
+		$dry_run = false;
 		if (is_array($options)) {
 			foreach ($options as $key => $value) {
 				switch (strtolower($key)) {
@@ -167,6 +168,10 @@ class Aws_util {
 						}
 						break;
 
+					case 'dry_run':
+						$dry_run = $value;
+						break;
+
 					default:
 						# code...
 						break;
@@ -183,10 +188,15 @@ class Aws_util {
 			$source,
 			$target
 		);
-		$this->_CI->load->add_package_path(config_item('common_package'));
-		$this->_CI->load->library('process_lib');
-		$this->_CI->load->remove_package_path(config_item('common_package'));
-		return $this->_CI->process_lib->execute($cmd);
+		if ($dry_run) {
+			return $cmd;
+		}
+		else {
+			$this->_CI->load->add_package_path(config_item('common_package'));
+			$this->_CI->load->library('process_lib');
+			$this->_CI->load->remove_package_path(config_item('common_package'));
+			return $this->_CI->process_lib->execute($cmd);
+		}
 	}
 
 	public function s3_del($s3_key)
