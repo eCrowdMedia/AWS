@@ -264,7 +264,6 @@ class Aws_util {
 
 	private function _load_config($file)
 	{
-		$this->_CI =& get_instance();
 		$config = $this->_CI->config->item($file);
 		if (empty($config)) {
 			$this->_CI->config->load($file, true);
