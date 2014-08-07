@@ -30,12 +30,14 @@
 }
 */
 class Aws_util {
-	private $_cli_base = FALSE;
+	private $_cli_base = false;
 	private static $_s3_protocol = 's3://';
+	private $_CI = false;
 
 	function __construct($config = array())
 	{
 		$this->_cli_base = isset($config['cli']) ? $config['cli'] : (BASEPATH . 'cli.php');
+		$this->_CI =& get_instance();
 	}
 
 	public function add_task($task)
@@ -172,20 +174,19 @@ class Aws_util {
 			}
 		}
 
-		$CI =& get_instance();
-		$CI->config->load('cmd', true);
+		$this->_load_config('cmd');
 		$cmd = sprintf(
 			'%s %s %s "%s" "%s"',
-			$CI->config->item('cmd_s3cmd', 'cmd'),
+			$this->_CI->config->item('cmd_s3cmd', 'cmd'),
 			$mode,
 			implode(' ', $args),
 			$source,
 			$target
 		);
-		$CI->load->add_package_path(config_item('common_package'));
-		$CI->load->library('process_lib');
-		$CI->load->remove_package_path(config_item('common_package'));
-		return $CI->process_lib->execute($cmd);
+		$this->_CI->load->add_package_path(config_item('common_package'));
+		$this->_CI->load->library('process_lib');
+		$this->_CI->load->remove_package_path(config_item('common_package'));
+		return $this->_CI->process_lib->execute($cmd);
 	}
 
 	public function s3_del($s3_key)
@@ -193,23 +194,21 @@ class Aws_util {
 		if (empty($s3_key) OR strpos($s3_key, self::$_s3_protocol) !== 0) {
 			return false;
 		}
-		$CI =& get_instance();
-		$CI->config->load('cmd', true);
-		$CI->load->add_package_path(config_item('common_package'));
-		$CI->load->library('process_lib');
-		$CI->load->remove_package_path(config_item('common_package'));
-		return $CI->process_lib->execute($CI->config->item('cmd_s3cmd', 'cmd') . ' del -r ' . $s3_key);
+		$this->_load_config('cmd');
+		$this->_CI->load->add_package_path(config_item('common_package'));
+		$this->_CI->load->library('process_lib');
+		$this->_CI->load->remove_package_path(config_item('common_package'));
+		return $this->_CI->process_lib->execute($this->_CI->config->item('cmd_s3cmd', 'cmd') . ' del -r ' . $s3_key);
 	}
 
 	public function s3_key(array $params, $mode = 'ebook', $use_cf = false)
 	{
-		$CI =& get_instance();
-		$CI->config->load('aws', true);
+		$this->_load_config('aws');
 		$segments = array(
 			self::$_s3_protocol . (
 				$use_cf ?
-					$CI->config->item('cf_bucket', 'aws') :
-					$CI->config->item('s3_bucket', 'aws')
+					$this->_CI->config->item('cf_bucket', 'aws') :
+					$this->_CI->config->item('s3_bucket', 'aws')
 			),
 			$mode
 		);
@@ -251,6 +250,15 @@ class Aws_util {
 				break;
 		}
 		return implode('/', $segments) . '/';
+	}
+
+	private function _load_config($file)
+	{
+		$this->_CI =& get_instance();
+		$config = $this->_CI->config->item($file);
+		if (empty($config)) {
+			$this->_CI->config->load($file, true);
+		}
 	}
 }
 // END Aws_util Class
