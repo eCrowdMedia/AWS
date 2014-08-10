@@ -240,7 +240,7 @@ class Aws_util {
 					}
 					$setting = json_decode($file['setting'], true);
 					if (isset($setting['revision'])) {
-						$segments[] = $file['version'] . '_' . $file['revision'];
+						$segments[] = $file['version'] . '_' . $setting['revision'];
 					}
 				}
 				// manifestataion
@@ -254,6 +254,17 @@ class Aws_util {
 				break;
 
 			case 'cover':
+				if (isset($params['manifestation'])) {
+					if (empty($params['manifestation']['sn'])) {
+						return false;
+					}
+					$this->load->helper('id_encrypt');
+					$encoded_id = id_encode($params['manifestation']['sn']);
+					$segments[] = substr($encoded_id, 0, 2);
+					$segments[] = substr($encoded_id, 2);
+				}
+				break;
+
 			case 'avatar':
 			default:
 				return false;
