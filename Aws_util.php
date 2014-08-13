@@ -238,7 +238,9 @@ class Aws_util {
 						empty($file['setting'])) {
 						break;
 					}
-					$setting = json_decode($file['setting'], true);
+					if (is_string($file['setting'])) {
+						$setting = json_decode($file['setting'], true);
+					}
 					if (isset($setting['revision'])) {
 						$segments[] = $file['version'] . '_' . $setting['revision'];
 					}
