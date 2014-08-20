@@ -286,6 +286,16 @@ class Aws_util {
 		}
 		return $this->_CI->config->item($file);
 	}
+
+	public function get_config($key)
+	{
+		return $this->_config[$key];
+	}
+
+	public function set_config($key, $value)
+	{
+		$this->_config[$key] = $value;
+	}
 }
 // END Aws_util Class
 
