@@ -30,14 +30,21 @@
 }
 */
 class Aws_util {
-	private $_cli_base = false;
 	private static $_s3_protocol = 's3://';
 	private $_CI = false;
+	private $_config = false;
 
 	function __construct($config = array())
 	{
-		$this->_cli_base = isset($config['cli']) ? $config['cli'] : (BASEPATH . 'cli.php');
 		$this->_CI =& get_instance();
+		$this->_config = array_merge(
+			array(
+				'eb_cli' => BASEPATH . 'cli.php'
+			),
+			$this->_load_config('aws'),
+			$this->_load_config('cmd'),
+			$config
+		);
 	}
 
 	public function add_task($task)
@@ -80,7 +87,7 @@ class Aws_util {
 
 	private function _cli_to_cmd($cli)
 	{
-		$command = $this->_cli_base;
+		$command = $this->_config['eb_cli'];
 		if (is_string($cli))
 			$command .= ' ' . $cli;
 		elseif (isset($cli['class']))
@@ -179,10 +186,9 @@ class Aws_util {
 			}
 		}
 
-		$this->_load_config('cmd');
 		$cmd = sprintf(
 			'%s %s %s "%s" "%s"',
-			$this->_CI->config->item('cmd_s3cmd', 'cmd'),
+			$this->_config['cmd_s3cmd'],
 			$mode,
 			implode(' ', $args),
 			$source,
@@ -204,21 +210,19 @@ class Aws_util {
 		if (empty($s3_key) OR strpos($s3_key, self::$_s3_protocol) !== 0) {
 			return false;
 		}
-		$this->_load_config('cmd');
 		$this->_CI->load->add_package_path(config_item('common_package'));
 		$this->_CI->load->library('process_lib');
 		$this->_CI->load->remove_package_path(config_item('common_package'));
-		return $this->_CI->process_lib->execute($this->_CI->config->item('cmd_s3cmd', 'cmd') . ' del -r ' . $s3_key);
+		return $this->_CI->process_lib->execute($this->_config['cmd_s3cmd'] . ' del -r ' . $s3_key);
 	}
 
 	public function s3_key(array $params, $mode = 'ebook', $use_cf = false)
 	{
-		$this->_load_config('aws');
 		$segments = array(
 			self::$_s3_protocol . (
 				$use_cf ?
-					$this->_CI->config->item('cf_bucket', 'aws') :
-					$this->_CI->config->item('s3_bucket', 'aws')
+					$this->_config['cf_bucket'] :
+					$this->_config['s3_bucket']
 			),
 			$mode
 		);
@@ -281,6 +285,7 @@ class Aws_util {
 		if (empty($config)) {
 			$this->_CI->config->load($file, true);
 		}
+		return $this->_CI->config->item($file);
 	}
 }
 // END Aws_util Class
