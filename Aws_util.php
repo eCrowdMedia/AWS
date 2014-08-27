@@ -284,7 +284,8 @@ class Aws_util {
 		if (empty($config)) {
 			$this->_CI->config->load($file, true);
 		}
-		return $this->_CI->config->item($file);
+		$config = $this->_CI->config->item($file);
+		return empty($config) ? array() : $config;
 	}
 
 	public function get_config($key)
