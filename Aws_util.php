@@ -130,6 +130,7 @@ class Aws_util {
 		$args = array();
 		$mode = 'sync';
 		$dry_run = false;
+		$use_quote = true;
 		if (is_array($options)) {
 			foreach ($options as $key => $value) {
 				switch (strtolower($key)) {
@@ -178,6 +179,10 @@ class Aws_util {
 						$dry_run = $value;
 						break;
 
+					case 'quote':
+						$use_quote = $value;
+						break;
+
 					default:
 						# code...
 						break;
@@ -186,7 +191,7 @@ class Aws_util {
 		}
 
 		$cmd = sprintf(
-			'%s %s %s "%s" "%s"',
+			empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
 			$this->_config['cmd_s3cmd'],
 			$mode,
 			implode(' ', $args),
