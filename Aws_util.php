@@ -184,7 +184,6 @@ class Aws_util {
 						break;
 
 					default:
-						# code...
 						break;
 				}
 			}
@@ -232,7 +231,6 @@ class Aws_util {
 		);
 		switch ($mode) {
 			case 'ebook':
-				// file
 				if (isset($params['file'])) {
 					$file = $params['file'];
 					if (empty($file['manifestation_id']) OR
@@ -272,6 +270,13 @@ class Aws_util {
 					$encoded_id = id_encode($params['manifestation']['sn']);
 					$segments[] = substr($encoded_id, 0, 2);
 					$segments[] = substr($encoded_id, 2);
+				}
+				break;
+
+			case 'book':
+				$segments[] = empty($params['mode']) ? 'preview' : $params['mode'];
+				if ( ! empty($params['readmoo_id'])) {
+					$segments[] = $params['readmoo_id'];
 				}
 				break;
 
