@@ -281,6 +281,11 @@ class Aws_util {
 				break;
 
 			case 'avatar':
+				if (isset($params['avatar_path'])) {
+					$segments[] = $params['avatar_path'];
+				}
+				break;
+
 			default:
 				return false;
 				break;
