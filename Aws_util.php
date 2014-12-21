@@ -286,6 +286,36 @@ class Aws_util {
 				}
 				break;
 
+			case 'full':
+			case 'preview':
+			case 'manual':
+			case 'cipher':
+				if (empty($params['file'])) {
+					return false;
+				}
+				array_pop($segments);
+				$segments[] = 'ebook';
+				$file = $params['file'];
+				if (empty($file['manifestation_id']) OR
+					empty($file['sn'])) {
+					return false;
+				}
+				$segments[] = $file['manifestation_id'] % 1000;
+				$segments[] = $file['manifestation_id'];
+				$segments[] = $file['sn'];
+				if (empty($file['version']) OR
+					empty($file['setting'])) {
+					return false;
+				}
+				$setting = is_string($file['setting']) ?
+					json_decode($file['setting'], true) :
+					$file['setting'];
+				if (isset($setting['revision'])) {
+					$segments[] = $file['version'] . '_' . $setting['revision'];
+				}
+				$segments[] = $mode;
+				break;
+
 			default:
 				return false;
 				break;
