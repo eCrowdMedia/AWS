@@ -135,7 +135,7 @@ class Aws_util {
 			foreach ($options as $key => $value) {
 				switch (strtolower($key)) {
 					case 'mode':
-						if (in_array($value, array('sync', 'get', 'put'))) {
+						if (in_array($value, array('sync', 'get', 'put', 'cp', 'mv'))) {
 							$mode = $value;
 						}
 						if ($mode == 'put' &&
