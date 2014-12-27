@@ -289,7 +289,6 @@ class Aws_util {
 			case 'full':
 			case 'preview':
 			case 'manual':
-			case 'cipher':
 				if (empty($params['file'])) {
 					return false;
 				}
