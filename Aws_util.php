@@ -266,7 +266,7 @@ class Aws_util {
 					if (empty($params['manifestation']['sn'])) {
 						return false;
 					}
-					$this->load->helper('id_encrypt');
+					function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
 					$encoded_id = id_encode($params['manifestation']['sn']);
 					$segments[] = substr($encoded_id, 0, 2);
 					$segments[] = substr($encoded_id, 2);
