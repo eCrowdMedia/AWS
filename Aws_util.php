@@ -221,7 +221,7 @@ class Aws_util {
 		}
 
 		if ($quite) {
-			$args[] = '-r';
+			$args[] = '-q';
 		}
 		if ($no_mime_magic) {
 			$args[] = '--no-mime-magic';
