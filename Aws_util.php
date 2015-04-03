@@ -206,12 +206,26 @@ class Aws_util {
 						$use_quote = $value;
 						break;
 
+					case 'quite':
+						$quite = $value;
+						break;
+
+					case 'no-mime-magic':
+						$no_mime_magic = $value;
+						break;
+
 					default:
 						break;
 				}
 			}
 		}
 
+		if ($quite) {
+			$args[] = '-r';
+		}
+		if ($no_mime_magic) {
+			$args[] = '--no-mime-magic';
+		}
 		$cmd = sprintf(
 			empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
 			$this->_config['cmd_s3cmd'],
