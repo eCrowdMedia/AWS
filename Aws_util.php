@@ -15,7 +15,7 @@
 			"path: "task",
 			"class": "import",
 			"method": "explore",
-			"parameters": array($json['key'])
+			"parameters": [$json['key']]
 		},
 		{
 			cli: ""
@@ -38,9 +38,9 @@ class Aws_util {
 	{
 		$this->_CI =& get_instance();
 		$this->_config = array_merge(
-			array(
+			[
 				'eb_cli' => BASEPATH . 'cli.php'
-			),
+			],
 			$this->_load_config('aws'),
 			$config
 		);
@@ -48,94 +48,117 @@ class Aws_util {
 
 	public function add_task($task)
 	{
-		if (is_string($task))
+		if (is_string($task)) {
 			$this->add_cmd($task);
-		elseif (isset($task['cmd']))
+		}
+		elseif (isset($task['cmd'])) {
 			$this->add_cmd($task['cmd']);
-		elseif (isset($task['cli']))
+		}
+		elseif (isset($task['cli'])) {
 			$this->add_cli($task['cli']);
-		elseif (is_array($task))
-			foreach ($task as $key => $value)
-				if (is_numeric($key)) $this->add_task($value);
+		}
+		elseif (is_array($task)) {
+			foreach ($task as $key => $value) {
+				is_numeric($key) && $this->add_task($value);
+			}
+		}
 		return $this;
 	}
 
 	public function add_cmd($cmd)
 	{
-		if (is_string($cmd))
-			$this->_tasks[] = array(
+		if (is_string($cmd)) {
+			$this->_tasks[] = [
 				'cmd' => $cmd
-			);
-		elseif (is_array($cmd))
-			foreach ($cmd as $key => $value)
-				if (is_numeric($key) && is_string($value))
-					$this->_tasks[] = array(
+			];
+		}
+		elseif (is_array($cmd)) {
+			foreach ($cmd as $key => $value) {
+				if (is_numeric($key) && is_string($value)) {
+					$this->_tasks[] = [
 						'cmd' => $value
-					);
+					];
+				}
+			}
+		}
 		return $this;
 	}
 
 	public function add_cli($cli)
 	{
-		if (is_array($cli) && empty($cli['class'])) return;
-		$this->_tasks[] = array(
+		if (is_array($cli) && empty($cli['class'])) {
+			return;
+		}
+		$this->_tasks[] = [
 			'cli' => $cli
-		);
+		];
 		return $this;
 	}
 
 	private function _cli_to_cmd($cli)
 	{
 		$command = $this->_config['eb_cli'];
-		if (is_string($cli))
+		if (is_string($cli)) {
 			$command .= ' ' . $cli;
-		elseif (isset($cli['class']))
-		{
-			empty($cli['path']) OR $command .= ' ' . implode(' ', (array)$cli['path']);
+		}
+		elseif (isset($cli['class'])) {
+			if ( ! empty($cli['path'])) {
+				$command .= ' ' . implode(' ', (array)$cli['path']);
+			}
 			$command .= ' ' . $cli['class'];
 			$command .= ' ' . ((empty($cli['method']) OR ! is_string($cli['method'])) ? 'index' : $cli['method']);
-			if (isset($cli['parameters'])) $command .= ' ' . (is_array($cli['parameters']) ? implode(' ', $cli['parameters']) : $cli['parameters']);
+			if (isset($cli['parameters'])) {
+				$command .= ' ' . (is_array($cli['parameters']) ? implode(' ', $cli['parameters']) : $cli['parameters']);
+			}
 		}
-		else
+		else {
 			return FALSE;
+		}
 		return $command;
 	}
 
 	public function get_combined_cmd($tasks = array())
 	{
-		foreach ($tasks as $mode => $task)
+		foreach ($tasks as $mode => $task) {
 			$this->add_task($task);
+		}
 		$cmds = array();
-		foreach ($this->_tasks as $task)
-		{
-			if (isset($task['cmd']))
+		foreach ($this->_tasks as $task) {
+			if (isset($task['cmd'])) {
 				$cmd = $task['cmd'];
-			elseif (isset($task['cli']))
+			}
+			elseif (isset($task['cli'])) {
 				$cmd = $this->_cli_to_cmd($task['cli']);
-			else
+			}
+			else {
 				unset($cmd);
-			if ( ! empty($cmd)) $cmds[] = $cmd;
+			}
+			if ( ! empty($cmd)) {
+				$cmds[] = $cmd;
+			}
 		}
 		return implode(' && ', $cmds);
 	}
 
 	public function clear_task()
 	{
-		$this->_tasks = array();
+		$this->_tasks = [];
 		return $this;
 	}
 
 	public function s3_sync($source, $target, $options = false)
 	{
-		$args = array();
+		$args = [];
 		$mode = 'sync';
 		$dry_run = false;
 		$use_quote = true;
+		$quite = true;
+		$no_mime_magic = true;
 		if (is_array($options)) {
 			foreach ($options as $key => $value) {
 				switch (strtolower($key)) {
 					case 'mode':
-						if (in_array($value, array('sync', 'get', 'put', 'cp', 'mv'))) {
+						if (in_array($value, ['sync', 'get', 'put', 'cp', 'mv'])) {
 							$mode = $value;
 						}
 						if ($mode == 'put' &&
@@ -221,27 +244,29 @@ class Aws_util {
 
 	public function s3_key(array $params, $mode = 'ebook', $use_cf = false)
 	{
-		$segments = array(
+		$segments = [
 			self::$_s3_protocol . (
 				$use_cf ?
 					$this->_config['cf_bucket'] :
 					$this->_config['s3_bucket']
 			),
 			$mode
-		);
+		];
 		switch ($mode) {
 			case 'ebook':
 				if (isset($params['file'])) {
 					$file = $params['file'];
 					if (empty($file['manifestation_id']) OR
-						empty($file['sn'])) {
+						empty($file['sn'])
+					) {
 						return false;
 					}
 					$segments[] = $file['manifestation_id'] % 1000;
 					$segments[] = $file['manifestation_id'];
 					$segments[] = $file['sn'];
 					if (empty($file['version']) OR
-						empty($file['setting'])) {
+						empty($file['setting'])
+					) {
 						break;
 					}
 					$setting = is_string($file['setting']) ?
@@ -329,7 +354,7 @@ class Aws_util {
 			$this->_CI->config->load($file, true);
 		}
 		$config = $this->_CI->config->item($file);
-		return empty($config) ? array() : $config;
+		return empty($config) ? [] : $config;
 	}
 
 	public function get_config($key)
