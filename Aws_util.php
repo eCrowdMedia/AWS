@@ -354,6 +354,16 @@ class Aws_util {
 				$segments[] = $mode;
 				break;
 
+			case 'social_cover':
+				if (empty($params['book_id'])) {
+					return false;
+				}
+				function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
+				$encoded_id = id_encode($params['book_id']);
+				$segments[] = substr($encoded_id, 0, 2);
+				$segments[] = substr($encoded_id, 2);
+				break;
+
 			default:
 				return false;
 				break;
