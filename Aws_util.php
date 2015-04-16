@@ -301,15 +301,18 @@ class Aws_util {
 				break;
 
 			case 'cover':
-				if (isset($params['manifestation'])) {
-					if (empty($params['manifestation']['sn'])) {
-						return false;
-					}
+				if ( ! empty($params['manifestation']['sn'])) {
 					function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
 					$encoded_id = id_encode($params['manifestation']['sn']);
-					$segments[] = substr($encoded_id, 0, 2);
-					$segments[] = substr($encoded_id, 2);
 				}
+				elseif (isset($params['encoded_id'])) {
+					$encoded_id = $params['encoded_id'];
+				}
+				if (empty($encoded_id) OR strlen($encoded_id) <= 2) {
+					return false;
+				}
+				$segments[] = substr($encoded_id, 0, 2);
+				$segments[] = substr($encoded_id, 2);
 				break;
 
 			case 'book':
