@@ -386,6 +386,98 @@ class Aws_lib {
 	}
 
 	/**
+	 * @method Model getDistribution(array $args = array()) {@command CloudFront GetDistribution}
+	 */
+	public function getDistribution($cfID)
+	{
+		try {
+			return $this->cfClient->getDistribution(array('Id' => $cfID));
+		} catch (CloudFrontException $e) {
+			return $this->debug ? $e->getMessage() : false;
+		}
+	}
+
+	/**
+	 * @method Model listDistributions(array $args = array()) {@command CloudFront ListDistributions}
+	 */
+	public function listDistributions($cname = false)
+	{
+		try {
+			$distributions = $this->cfClient->listDistributions();
+			$result = [];
+			if ($cname) {
+				foreach ($distributions->get('Items') as $distribution) {
+					if ($distribution['Aliases']['Quantity'] > 1) {
+						foreach ($distribution['Aliases']['Items'] as $alias) {
+							if (preg_match(sprintf('/%s$/', $cname), $alias)) {
+								$result[] = $distribution;
+								break;
+							}
+						}
+					}
+				}
+			}
+			else {
+				$result = $distributions->get('Items');
+			}
+			return $result;
+		} catch (CloudFrontException $e) {
+			return $this->debug ? $e->getMessage() : false;
+		}
+	}
+
+	/**
+	 * @method Model createInvalidation(array $args = array()) {@command CloudFront CreateInvalidation}
+	 */
+	public function createInvalidation($cfID, array $paths, $caller_reference = false)
+	{
+		try {
+			if (empty($paths)) {
+				return false;
+			}
+			elseif (empty($caller_reference)) {
+				$caller_reference = rtrim(base64_encode(sha1(implode("\x01", $paths) . date('Y-m-d H:i:s'))), '=');
+				return $this->cfClient->createInvalidation([
+					'DistributionId' => $cfID,
+					'Paths' => [
+						'Quantity' => count($paths),
+						'Items' => $paths
+					],
+					'CallerReference' => $caller_reference
+				]);
+			}
+		} catch (CloudFrontException $e) {
+			return $this->debug ? $e->getMessage() : false;
+		}
+	}
+	/**
+	 * Client to interact with Amazon CloudFront
+	 *
+	 * @method Model createCloudFrontOriginAccessIdentity(array $args = array()) {@command CloudFront CreateCloudFrontOriginAccessIdentity}
+	 * @method Model createStreamingDistribution(array $args = array()) {@command CloudFront CreateStreamingDistribution}
+	 * @method Model deleteCloudFrontOriginAccessIdentity(array $args = array()) {@command CloudFront DeleteCloudFrontOriginAccessIdentity}
+	 * @method Model deleteStreamingDistribution(array $args = array()) {@command CloudFront DeleteStreamingDistribution}
+	 * @method Model getCloudFrontOriginAccessIdentity(array $args = array()) {@command CloudFront GetCloudFrontOriginAccessIdentity}
+	 * @method Model getCloudFrontOriginAccessIdentityConfig(array $args = array()) {@command CloudFront GetCloudFrontOriginAccessIdentityConfig}
+	 * @method Model getDistributionConfig(array $args = array()) {@command CloudFront GetDistributionConfig}
+	 * @method Model getInvalidation(array $args = array()) {@command CloudFront GetInvalidation}
+	 * @method Model getStreamingDistribution(array $args = array()) {@command CloudFront GetStreamingDistribution}
+	 * @method Model getStreamingDistributionConfig(array $args = array()) {@command CloudFront GetStreamingDistributionConfig}
+	 * @method Model listCloudFrontOriginAccessIdentities(array $args = array()) {@command CloudFront ListCloudFrontOriginAccessIdentities}
+	 * @method Model listInvalidations(array $args = array()) {@command CloudFront ListInvalidations}
+	 * @method Model listStreamingDistributions(array $args = array()) {@command CloudFront ListStreamingDistributions}
+	 * @method Model updateCloudFrontOriginAccessIdentity(array $args = array()) {@command CloudFront UpdateCloudFrontOriginAccessIdentity}
+	 * @method Model updateStreamingDistribution(array $args = array()) {@command CloudFront UpdateStreamingDistribution}
+	 * @method waitUntilStreamingDistributionDeployed(array $input) The input array uses the parameters of the GetStreamingDistribution operation and waiter specific settings
+	 * @method waitUntilDistributionDeployed(array $input) The input array uses the parameters of the GetDistribution operation and waiter specific settings
+	 * @method waitUntilInvalidationCompleted(array $input) The input array uses the parameters of the GetInvalidation operation and waiter specific settings
+	 * @method ResourceIteratorInterface getListCloudFrontOriginAccessIdentitiesIterator(array $args = array()) The input array uses the parameters of the ListCloudFrontOriginAccessIdentities operation
+	 * @method ResourceIteratorInterface getListDistributionsIterator(array $args = array()) The input array uses the parameters of the ListDistributions operation
+	 * @method ResourceIteratorInterface getListInvalidationsIterator(array $args = array()) The input array uses the parameters of the ListInvalidations operation
+	 * @method ResourceIteratorInterface getListStreamingDistributionsIterator(array $args = array()) The input array uses the parameters of the ListStreamingDistributions operation
+	 */
+
+	/**
 	 * @method Model createQueue(array $args = array()) {@command Sqs CreateQueue}
 	 */
  	public function createQueue($queueName, $attributes = false)
