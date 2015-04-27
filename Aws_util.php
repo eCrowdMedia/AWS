@@ -308,11 +308,10 @@ class Aws_util {
 				elseif (isset($params['encoded_id'])) {
 					$encoded_id = $params['encoded_id'];
 				}
-				if (empty($encoded_id) OR strlen($encoded_id) <= 2) {
-					return false;
+				if (isset($encoded_id) && strlen($encoded_id) > 2) {
+					$segments[] = substr($encoded_id, 0, 2);
+					$segments[] = substr($encoded_id, 2);
 				}
-				$segments[] = substr($encoded_id, 0, 2);
-				$segments[] = substr($encoded_id, 2);
 				break;
 
 			case 'book':
