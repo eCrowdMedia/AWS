@@ -396,6 +396,81 @@ class Aws_util {
 	{
 		$this->_config[$key] = $value;
 	}
+
+	public function set_signed_cookies(array $params)
+	{
+		if (empty($params['url']) OR
+			! preg_match('|(http[s\*]?):\/\/([^\/]+)(\/.*)$|', $params['url'], $match)
+		) {
+			throw new Exception('Invalid parameters, no url found.', 400);
+		}
+		$use_custom_policy = strpos($match[3], '*') > 0;
+		if ($use_custom_policy) {
+			$policy = $this->_get_encoded_custom_policy($params);
+
+			$this->_set_cookie(
+				'Policy',
+				$policy,
+				$use_custom_policy ?
+					substr($match[3], 0, strpos($match[3], '*')) :
+					$match[3],
+				$match[1] != 'http'
+			);
+
+
+		}
+		else {
+			$policy = $this->_get_canned_policy($params);
+		}
+
+		return true;
+	}
+
+	private function _get_encoded_custom_policy(array $params)
+	{
+		$policy = $this->_get_policy_statement($params);
+		if (isset($params['greater_than'])) {
+			$policy['Statement']['Condition']['DateGreaterThan'] = ['AWS:EpochTime' => $params['greater_than']];
+		}
+		if (isset($params['ip'])) {
+			$policy['Statement']['Condition']['IpAddress'] = $params['ip'];
+		}
+		return str_replace(['+', '=', '/'], ['-', '_', '~'], base64_encode(json_encode($policy)));
+	}
+
+	private function _get_canned_policy(array $params)
+	{
+		return json_encode($this->_get_policy_statement($params));
+	}
+
+	private function _get_policy_statement(array $params)
+	{
+		return [
+			'Statement' => [
+				'Resource' => $params['url'],
+				'Condition' => [
+					'DateLessThan' => [
+						'AWS:EpochTime' => empty($params['less_than']) ?
+							time() + config_item('sess_expiration') :
+							$params['less_than']
+					]
+				]
+			]
+		];
+	}
+
+	private function _set_cookie($name, $value, $path, $secure = true)
+	{
+		setcookie(
+			'CloudFront-' . $name,
+			$value,
+			0,
+			$path,
+			$_SERVER['DOMAIN'],
+			$secure,
+			true
+		);
+	}
 }
 // END Aws_util Class
 
