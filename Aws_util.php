@@ -356,14 +356,18 @@ class Aws_util {
 				$segments[] = $mode;
 				break;
 
-			case 'social_cover':
-				if (empty($params['book_id'])) {
-					return false;
+			case 'social/cover':
+				if ( ! empty($params['work_id'])) {
+					function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
+					$encoded_id = id_encode($params['work_id']);
 				}
-				function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
-				$encoded_id = id_encode($params['book_id']);
-				$segments[] = substr($encoded_id, 0, 2);
-				$segments[] = substr($encoded_id, 2);
+				elseif (isset($params['encoded_id'])) {
+					$encoded_id = $params['encoded_id'];
+				}
+				if (isset($encoded_id) && strlen($encoded_id) > 2) {
+					$segments[] = substr($encoded_id, 0, 2);
+					$segments[] = substr($encoded_id, 2);
+				}
 				break;
 
 			default:
