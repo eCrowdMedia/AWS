@@ -404,29 +404,55 @@ class Aws_util {
 		) {
 			throw new Exception('Invalid parameters, no url found.', 400);
 		}
+		$key_id = $this->get_config('cf_keypair_id');
 		$use_custom_policy = strpos($match[3], '*') > 0;
+		$path = $use_custom_policy ?
+			substr($match[3], 0, strpos($match[3], '*')) :
+			$match[3];
+		$secure = $match[1] != 'http';
+		if (empty($params['less_than'])) {
+			$params['less_than'] = time() + config_item('sess_expiration');
+		}
+							
 		if ($use_custom_policy) {
-			$policy = $this->_get_encoded_custom_policy($params);
+			$policy = $this->_get_custom_policy($params);
 
 			$this->_set_cookie(
 				'Policy',
-				$policy,
-				$use_custom_policy ?
-					substr($match[3], 0, strpos($match[3], '*')) :
-					$match[3],
-				$match[1] != 'http'
+				$this->_safe_base64_encode($policy),
+				$path,
+				$secure
 			);
-
-
 		}
 		else {
 			$policy = $this->_get_canned_policy($params);
+
+			$this->_set_cookie(
+				'Expires',
+				$params['less_than'],
+				$path,
+				$secure
+			);
 		}
 
+		$this->_set_cookie(
+			'Signature',
+			$this->_safe_base64_encode($this->_sign($policy)),
+			$path,
+			$secure
+		);
+
+		$this->_set_cookie(
+			'Key-Pair-Id',
+			$key_id,
+			$path,
+			$secure
+		);
+echo $policy;
 		return true;
 	}
 
-	private function _get_encoded_custom_policy(array $params)
+	private function _get_custom_policy(array $params)
 	{
 		$policy = $this->_get_policy_statement($params);
 		if (isset($params['greater_than'])) {
@@ -435,7 +461,7 @@ class Aws_util {
 		if (isset($params['ip'])) {
 			$policy['Statement']['Condition']['IpAddress'] = $params['ip'];
 		}
-		return str_replace(['+', '=', '/'], ['-', '_', '~'], base64_encode(json_encode($policy)));
+		return json_encode($policy);
 	}
 
 	private function _get_canned_policy(array $params)
@@ -450,13 +476,25 @@ class Aws_util {
 				'Resource' => $params['url'],
 				'Condition' => [
 					'DateLessThan' => [
-						'AWS:EpochTime' => empty($params['less_than']) ?
-							time() + config_item('sess_expiration') :
-							$params['less_than']
+						'AWS:EpochTime' => $params['less_than']
 					]
 				]
 			]
 		];
+	}
+
+	private function _safe_base64_encode($content)
+	{
+		return str_replace(['+', '=', '/'], ['-', '_', '~'], base64_encode($content));
+	}
+
+	private function _sign($data)
+	{
+		$priv_key_id = openssl_get_privatekey('file://' . $this->get_config('cf_pk_pathname'));
+		openssl_sign($data, $signature, $priv_key_id);
+		openssl_free_key($priv_key_id);
+
+		return $signature;
 	}
 
 	private function _set_cookie($name, $value, $path, $secure = true)
