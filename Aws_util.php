@@ -461,25 +461,28 @@ class Aws_util {
 		if (isset($params['ip'])) {
 			$policy['Statement']['Condition']['IpAddress'] = $params['ip'];
 		}
-		return json_encode($policy);
+		return json_encode($policy, JSON_UNESCAPED_SLASHES);
 	}
 
 	private function _get_canned_policy(array $params)
 	{
-		return json_encode($this->_get_policy_statement($params));
+		return json_encode(
+			$this->_get_policy_statement($params),
+			JSON_UNESCAPED_SLASHES
+		);
 	}
 
 	private function _get_policy_statement(array $params)
 	{
 		return [
-			'Statement' => [
+			'Statement' => [[
 				'Resource' => $params['url'],
 				'Condition' => [
 					'DateLessThan' => [
 						'AWS:EpochTime' => $params['less_than']
 					]
 				]
-			]
+			]]
 		];
 	}
 
