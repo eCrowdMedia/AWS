@@ -448,7 +448,7 @@ class Aws_util {
 			$path,
 			$secure
 		);
-echo $policy;
+
 		return true;
 	}
 
