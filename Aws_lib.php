@@ -226,6 +226,34 @@ class Aws_lib {
 	}
 
 	/**
+	 * @method Model copyObject(array $args = array()) {@command S3 CopyObject}
+	 */
+	public function copyObject($bucket_name, $key, $source, array $options = array())
+	{
+		try {
+			if (empty($options['ACL'])) {
+				$options['ACL'] = strpos($bucket_name, 'readmoo-cf-') === 0 ?
+					CannedAcl::PUBLIC_READ :
+					CannedAcl::PRIVATE_ACCESS;
+			}
+			if (empty($options['StorageClass'])) {
+				$options['StorageClass'] = strpos($bucket_name, 'readmoo-cf-') === 0 ?
+					StorageClass::REDUCED_REDUNDANCY :
+					StorageClass::STANDARD;
+			}
+			$options = array(
+				'Bucket' => $bucket_name,
+				'Key' => $key,
+				'CopySource' => $source
+			) + $options;
+			return $this->s3Client->copyObject($options);
+		}
+		catch (S3Exception $e) {
+			return $this->debug ? $e->getMessage() : false;
+		}
+	}
+
+	/**
 	 * @method Model deleteObject(array $args = array()) {@command S3 DeleteObject}
 	 */
 	public function deleteObject($bucket_name, $s3key)
