@@ -1,5 +1,5 @@
 {
-	"name":"eCrowdMedia/AWS",
+	"name":"ecrowdmedia/aws",
 	"description":"AWS library for codeigniter",
 	"type":"codeigniter-library",
 	"keywords":["readmoo","ecrowdmedia","codeigniter","aws","sdk"],
@@ -19,7 +19,7 @@
 	"require": {
 		"php":">=5.5.0",
 		"composer/installers": "~1.0",
-		"aws/aws-sdk-php":"*",
-		"eCrowdMedia/Common": "dev-master"
+		"aws/aws-sdk-php":"^2.8",
+		"ecrowdmedia/common": "^1.6"
 	}
 }
