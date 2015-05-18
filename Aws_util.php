@@ -326,6 +326,11 @@ class Aws_util {
 					$segments[] = $params['avatar_path'];
 				}
 				break;
+			case 'social/banner':
+				if (isset($params['social_banner_path'])) {
+					$segments[] = $params['social_banner_path'];
+				}
+				break;
 
 			case 'full':
 			case 'preview':
