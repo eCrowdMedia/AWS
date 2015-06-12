@@ -322,11 +322,14 @@ class Aws_util {
 				break;
 
 			case 'avatar':
+			case 'social/group_avatar':
 				if (isset($params['avatar_path'])) {
 					$segments[] = $params['avatar_path'];
 				}
 				break;
+
 			case 'social/banner':
+			case 'social/group_banner':
 				if (isset($params['social_banner_path'])) {
 					$segments[] = $params['social_banner_path'];
 				}
