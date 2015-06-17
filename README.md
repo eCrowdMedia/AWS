@@ -1,4 +1,4 @@
-AWS
+AWS package
 ===
 
 AWS SDK Wrapper library for CodeIgniter.
@@ -9,3 +9,7 @@ It provides couple APIs for different AWS services, which list below.
 1.  S3 APIs and Stream Wrapper
 1.  SQS APIs
 1.  CloudFront APIs
+
+ToDo List:
+
+1. Kinesis
