@@ -305,6 +305,28 @@ class Aws_lib {
 		return $this->s3Client->registerStreamWrapper();
 	}
 
+	/**
+	 * @method Model listObjects(array $args = array()) {@command S3 ListObjects}
+	 */
+	public function listObjects($bucket_name, $prefix = '')
+	{
+		try {
+			return $this->s3Client->listObjects([
+				'Bucket' =>  $bucket_name,
+				'Prefix' => $prefix
+			]);
+		}
+		catch (RuntimeException $e) {
+			return $this->debug ? $e->getMessage() : false;
+		}
+	}
+
+	/**
+	 * [createDistribution description]
+	 * @param  [type] $bucket_name [description]
+	 * @param  [type] $domain_name [description]
+	 * @return [type]              [description]
+	 */
 	public function createDistribution($bucket_name, $domain_name)
 	{
 		try {
