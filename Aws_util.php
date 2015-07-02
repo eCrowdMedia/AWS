@@ -378,6 +378,20 @@ class Aws_util {
 				}
 				break;
 
+			case 'campaign':
+				if (empty($params['name'])) {
+					return false;
+				}
+				$segments = [
+					'readmoo-campaign',
+					$mode,
+					$params['name']
+				];
+				if ( ! empty($params['path'])) {
+					$segments[] = $params['path'];
+				}
+				break;
+
 			default:
 				return false;
 				break;
