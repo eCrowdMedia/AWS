@@ -392,6 +392,17 @@ class Aws_util {
 				}
 				break;
 
+			case 'store/collection':
+				if (empty($params['collection_id'])) {
+					return false;
+				}
+				$segments[] = $params['collection_id'];
+			case 'store/banner':
+				if ( ! empty($params['path'])) {
+					$segments[] = $params['path'];
+				}
+				break;
+
 			default:
 				return false;
 				break;
