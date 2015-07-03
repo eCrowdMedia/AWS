@@ -383,7 +383,7 @@ class Aws_util {
 					return false;
 				}
 				$segments = [
-					'readmoo-campaign',
+					self::$_s3_protocol . 'readmoo-campaign',
 					$mode,
 					$params['name']
 				];
