@@ -256,6 +256,125 @@ class Aws_util {
 		return $this->_CI->process_lib->execute($this->_config['cmd_s3cmd'] . ' del -r ' . $s3_key);
 	}
 
+	private function _s3_key_ebook(array &$segments, array $params)
+	{
+		if (isset($params['file'])) {
+			$file = $params['file'];
+			if (empty($file['manifestation_id']) OR
+				empty($file['sn'])
+			) {
+				throw new Exception('Invalid parameters, no manifestation_id');
+			}
+			$segments[] = $file['manifestation_id'] % 1000;
+			$segments[] = $file['manifestation_id'];
+			$segments[] = $file['sn'];
+			if (empty($file['version']) OR
+				empty($file['setting'])
+			) {
+				return true;
+			}
+			$setting = is_string($file['setting']) ?
+				json_decode($file['setting'], true) :
+				$file['setting'];
+			if (isset($setting['revision'])) {
+				$segments[] = $file['version'] . '_' . $setting['revision'];
+			}
+		}
+		// manifestataion
+		elseif (isset($params['manifestation'])) {
+			if (empty($params['manifestation']['sn'])) {
+				throw new Exception('Invalid parameters, no manifestation_id');
+			}
+			$segments[] = $params['manifestation']['sn'] % 1000;
+			$segments[] = $params['manifestation']['sn'];
+		}
+	}
+
+	private function _s3_key_book(array &$segments, array $params)
+	{
+		$segments[] = empty($params['mode']) ? 'preview' : $params['mode'];
+		if ( ! empty($params['readmoo_id'])) {
+			$segments[] = $params['readmoo_id'];
+		}
+	}
+
+	private function _s3_key_file($mode, array &$segments, array $params)
+	{
+		if (empty($params['file'])) {
+			throw new Exception('Invalid parameters, no file found');
+		}
+		array_pop($segments);
+		$segments[] = 'ebook';
+		$file = $params['file'];
+		if (empty($file['manifestation_id']) OR
+			empty($file['sn'])) {
+			throw new Exception('Invalid parameters, no manifestation_id');
+		}
+		$segments[] = $file['manifestation_id'] % 1000;
+		$segments[] = $file['manifestation_id'];
+		$segments[] = $file['sn'];
+		if (empty($file['version']) OR
+			empty($file['setting'])) {
+			throw new Exception('Invalid parameters, file is incomplete');
+		}
+		$setting = is_string($file['setting']) ?
+			json_decode($file['setting'], true) :
+			$file['setting'];
+		if (isset($setting['revision'])) {
+			$segments[] = $file['version'] . '_' . $setting['revision'];
+		}
+		$segments[] = $mode;
+	}
+
+	private function _s3_key_cover($mode, array &$segments, array $params)
+	{
+		function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
+		switch ($mode) {
+			case 'cover':
+				if ( ! empty($params['manifestation']['sn'])) {
+					$encoded_id = id_encode($params['manifestation']['sn']);
+				}
+				break;
+			case 'social/cover':
+				if ( ! empty($params['work_id'])) {
+					$encoded_id = id_encode($params['work_id']);
+				}
+				break;
+			case 'share/cover':
+				if ( ! empty($params['manifestation_id'])) {
+					$encoded_id = id_encode($params['manifestation_id']);
+				}
+				break;
+			default:
+				break;
+		}
+		if (isset($params['encoded_id'])) {
+			$encoded_id = $params['encoded_id'];
+		}
+		if (isset($encoded_id) && strlen($encoded_id) > 2) {
+			$segments[] = substr($encoded_id, 0, 2);
+			$segments[] = substr($encoded_id, 2);
+		}
+		else {
+			throw new Exception('Invalid parameters, no proper id found');
+		}
+	}
+
+	private function _s3_key_campaign(array &$segments, array $params)
+	{
+		if (empty($params['name'])) {
+			throw new Exception('Invalid parameters, no campaign name');
+		}
+		$segments = [
+			self::$_s3_protocol . 'readmoo-campaign',
+			'campaign',
+			$params['name']
+		];
+		if ( ! empty($params['path'])) {
+			$segments[] = $params['path'];
+		}
+	}
+
 	public function s3_key(array $params, $mode = 'ebook', $use_cf = false)
 	{
 		$segments = [
@@ -268,144 +387,43 @@ class Aws_util {
 		];
 		switch ($mode) {
 			case 'ebook':
-				if (isset($params['file'])) {
-					$file = $params['file'];
-					if (empty($file['manifestation_id']) OR
-						empty($file['sn'])
-					) {
-						return false;
-					}
-					$segments[] = $file['manifestation_id'] % 1000;
-					$segments[] = $file['manifestation_id'];
-					$segments[] = $file['sn'];
-					if (empty($file['version']) OR
-						empty($file['setting'])
-					) {
-						break;
-					}
-					$setting = is_string($file['setting']) ?
-						json_decode($file['setting'], true) :
-						$file['setting'];
-					if (isset($setting['revision'])) {
-						$segments[] = $file['version'] . '_' . $setting['revision'];
-					}
-				}
-				// manifestataion
-				elseif (isset($params['manifestation'])) {
-					if (empty($params['manifestation']['sn'])) {
-						return false;
-					}
-					$segments[] = $params['manifestation']['sn'] % 1000;
-					$segments[] = $params['manifestation']['sn'];
-				}
-				break;
-
-			case 'cover':
-				if ( ! empty($params['manifestation']['sn'])) {
-					function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
-					$encoded_id = id_encode($params['manifestation']['sn']);
-				}
-				elseif (isset($params['encoded_id'])) {
-					$encoded_id = $params['encoded_id'];
-				}
-				if (isset($encoded_id) && strlen($encoded_id) > 2) {
-					$segments[] = substr($encoded_id, 0, 2);
-					$segments[] = substr($encoded_id, 2);
-				}
-				break;
-
 			case 'book':
-				$segments[] = empty($params['mode']) ? 'preview' : $params['mode'];
-				if ( ! empty($params['readmoo_id'])) {
-					$segments[] = $params['readmoo_id'];
-				}
-				break;
-
-			case 'avatar':
-			case 'social/group/avatar':
-				if (isset($params['avatar_path'])) {
-					$segments[] = $params['avatar_path'];
-				}
-				break;
-
-			case 'social/banner':
-			case 'social/group/banner':
-				if (isset($params['social_banner_path'])) {
-					$segments[] = $params['social_banner_path'];
-				}
+			case 'campaign':
+				$function = '_s3_key_' . $mode;
+				$this->{$function}($segments, $params);
 				break;
 
 			case 'full':
 			case 'preview':
 			case 'manual':
-				if (empty($params['file'])) {
-					return false;
-				}
-				array_pop($segments);
-				$segments[] = 'ebook';
-				$file = $params['file'];
-				if (empty($file['manifestation_id']) OR
-					empty($file['sn'])) {
-					return false;
-				}
-				$segments[] = $file['manifestation_id'] % 1000;
-				$segments[] = $file['manifestation_id'];
-				$segments[] = $file['sn'];
-				if (empty($file['version']) OR
-					empty($file['setting'])) {
-					return false;
-				}
-				$setting = is_string($file['setting']) ?
-					json_decode($file['setting'], true) :
-					$file['setting'];
-				if (isset($setting['revision'])) {
-					$segments[] = $file['version'] . '_' . $setting['revision'];
-				}
-				$segments[] = $mode;
+				$this->_s3_key_file($mode, $segments, $params);
 				break;
 
+			case 'cover':
 			case 'social/cover':
-				if ( ! empty($params['work_id'])) {
-					function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
-					$encoded_id = id_encode($params['work_id']);
-				}
-				elseif (isset($params['encoded_id'])) {
-					$encoded_id = $params['encoded_id'];
-				}
-				if (isset($encoded_id) && strlen($encoded_id) > 2) {
-					$segments[] = substr($encoded_id, 0, 2);
-					$segments[] = substr($encoded_id, 2);
-				}
-				break;
-
-			case 'campaign':
-				if (empty($params['name'])) {
-					return false;
-				}
-				$segments = [
-					self::$_s3_protocol . 'readmoo-campaign',
-					$mode,
-					$params['name']
-				];
-				if ( ! empty($params['path'])) {
-					$segments[] = $params['path'];
-				}
-				break;
-
-			case 'store/collection':
-				if (empty($params['collection_id'])) {
-					return false;
-				}
-				$segments[] = $params['collection_id'];
-			case 'store/banner':
-				if ( ! empty($params['path'])) {
-					$segments[] = $params['path'];
-				}
+			case 'share/cover':
+				$this->_s3_key_cover($mode, $segments, $params);
 				break;
 
 			default:
-				return false;
-				break;
+				$this->_CI->load->helper('print');
+				foreach ($this->_config['s3_key'] as $key => $value) {
+					if ($key == $mode OR preg_match(sprintf('!%s!', $key), $mode)) {
+						(isset($value['validate']) && empty($value['validate'])) OR
+						array_walk($params, function ($var) {
+							if (empty($var)) {
+								throw new Exception('Invalid args.', 1);
+							}
+						});
+
+						$result = vnsprintf($value['format'], $params);
+						if ( ! empty($result)) {
+							$segments[] = $result;
+						}
+						break 2;
+					}
+				}
+				return null;
 		}
 		return implode('/', $segments) . '/';
 	}
