@@ -375,7 +375,7 @@ class Aws_util {
 		}
 	}
 
-	public function s3_key(array $params, $mode = 'ebook', $use_cf = false)
+	public function s3_key(array $params, $mode = 'ebook', $use_cf = false, $trailing_slash = true)
 	{
 		$segments = [
 			self::$_s3_protocol . (
@@ -416,6 +416,10 @@ class Aws_util {
 							}
 						});
 
+						if (isset($value['trailing_slash'])) {
+							$trailing_slash = $value['trailing_slash'];
+						}
+
 						$result = vnsprintf($value['format'], $params);
 						if ( ! empty($result)) {
 							$segments[] = $result;
@@ -425,7 +429,10 @@ class Aws_util {
 				}
 				return null;
 		}
-		return implode('/', $segments) . '/';
+		if ($trailing_slash) {
+			$segments[] = '';
+		}
+		return implode('/', $segments);
 	}
 
 	private function _load_config($file)
