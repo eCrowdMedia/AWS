@@ -725,6 +725,24 @@ class Aws_lib {
 		}
 	}
 
+	public function putItem(array $params = array())
+	{
+		try {
+			return $this->dynamoDbClient->putItem($params);
+		} catch (DynamoDbException $e) {
+			return $this->debug ? $e->getMessage() : false;
+		}
+	}
+
+	public function queryItem(array $params = array())
+	{
+		try {
+			return $this->dynamoDbClient->query($params);
+		} catch (DynamoDbException $e) {
+			return $this->debug ? $e->getMessage() : false;
+		}
+	}
+
 	/**
 	 * @class SqsClient
 	 *
