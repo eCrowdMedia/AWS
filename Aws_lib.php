@@ -18,6 +18,7 @@ use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
 use Aws\Sqs\Enum\QueueAttribute;
 use Aws\Sqs\Exception\SqsException;
+use Aws\DynamoDb\DynamoDbClient;
 
 class Aws_lib {
 	private $aws;
@@ -25,6 +26,7 @@ class Aws_lib {
 	private $cfClient;
 	private $sqsClient;
 	private $cfIdentity;
+	private $dynamoDbClient;
 	public $debug = false;
 
 	function __construct($config = array())
@@ -41,6 +43,7 @@ class Aws_lib {
 		$this->s3Client = $this->aws->get('S3');
 		$this->cfClient = $this->aws->get('CloudFront');
 		$this->sqsClient = $this->aws->get('Sqs');
+		$this->dynamoDbClient = $this->aws->get('DynamoDb');
 	}
 
 	public function isValidBucketName($bucket_name)
