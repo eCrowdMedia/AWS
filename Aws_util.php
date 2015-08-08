@@ -458,7 +458,7 @@ class Aws_util {
 	public function set_signed_cookies(array $params)
 	{
 		if (empty($params['url']) OR
-			! preg_match('|(http[s\*]?):\/\/([^\/]+)(\/.*)$|', $params['url'], $match)
+			! preg_match('|^(http[s\*]?):\/\/([^\/]+)(\/.*)$|', $params['url'], $match)
 		) {
 			throw new Exception('Invalid parameters, no url found.', 400);
 		}
