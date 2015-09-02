@@ -161,9 +161,7 @@ class Aws_util {
 						if (in_array($value, ['sync', 'get', 'put', 'cp', 'mv'])) {
 							$mode = $value;
 						}
-						if ($mode == 'put' &&
-							(strpos($source, self::$_s3_protocol) === 0 OR ! file_exists($source))
-						) {
+						if ($mode == 'put' && strpos($source, self::$_s3_protocol) === 0) {
 							return false;
 						}
 						break;
