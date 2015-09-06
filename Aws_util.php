@@ -568,6 +568,54 @@ class Aws_util {
 			true
 		);
 	}
+
+	public function readfile($filename)
+	{
+		$args = [];
+		if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
+			$args['IfModifiedSince'] = $_SERVER['HTTP_IF_MODIFIED_SINCE'];
+		}
+		if (isset($_SERVER['HTTP_IF_NONE_MATCH'])) {
+			$args['IfNoneMatch'] = $_SERVER['HTTP_IF_NONE_MATCH'];
+		}
+		if (strpos($filename, self::$_s3_protocol) === 0) {
+			if ( ! preg_match('|^s3://([^/]+)/(.+)$|', $filename, $match)) {
+				return header('HTTP/1.0 404 Not Found');
+			}
+			isset($this->_CI->aws_lib) OR $this->_CI->load->library('aws/aws_lib');
+			$result = $this->_CI->aws_lib->headObject($match[1], $match[2], $args);
+			if (empty($result)) {
+				return header('HTTP/1.0 404 Not Found');
+			}
+			$args['ETag'] = $result->get('ETag');
+			$args['LastModified'] = $result->get('LastModified');
+			$args['ContentType'] = $result->get('ContentType');
+			$args['ContentLength'] = $result->get('ContentLength');
+		}
+		else {
+			$timestamp = filemtime($filename);
+			$args['ETag'] = '"' . md5('traditional chinese' . $timestamp) . '"';
+			$args['LastModified'] = gmdate('D, d M Y H:i:s ', $timestamp) . 'GMT';
+			$args['ContentType'] = null;
+			$args['ContentLength'] = filesize($filename);
+		}
+		if ((empty($args['IfNoneMatch']) || $args['ETag'] == $args['IfNoneMatch']) &&
+			(isset($args['IfModifiedSince']) && $args['LastModified'] == $args['IfModifiedSince'])
+		) {
+			return header('HTTP/1.1 304 Not Modified');
+		}
+
+		$this->_CI->load->helper('mime');
+
+		header('Cache-Control: private, max-age=29030400, pre-check=29030400');
+		header('Last-Modified: ' . $args['LastModified']);
+		header('ETag: ' . $args['ETag']);
+		header('Pragma: public');
+		header('Content-Type: ' . ext_mime_type($filename, $args['ContentType']));
+		header('Content-Length: ' . $args['ContentLength']);
+
+		readfile($filename);
+	}
 }
 // END Aws_util Class
 
