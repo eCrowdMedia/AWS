@@ -607,14 +607,18 @@ class Aws_util {
 
 		$this->_CI->load->helper('mime');
 
+		ob_start();
 		header('Cache-Control: private, max-age=29030400, pre-check=29030400');
 		header('Last-Modified: ' . $args['LastModified']);
 		header('ETag: ' . $args['ETag']);
 		header('Pragma: public');
 		header('Content-Type: ' . ext_mime_type($filename, $args['ContentType']));
 		header('Content-Length: ' . $args['ContentLength']);
+		ob_clean();
+		ob_end_flush();
 
 		readfile($filename);
+		exit; // Prevent CodeIgniter's output buffer.
 	}
 }
 // END Aws_util Class
