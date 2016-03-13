@@ -274,9 +274,11 @@ class Aws_util {
 			$setting = is_string($file['setting']) ?
 				json_decode($file['setting'], true) :
 				$file['setting'];
-			if (isset($setting['revision'])) {
-				$segments[] = $file['version'] . '_' . $setting['revision'];
-			}
+			$segments[] = sprintf(
+				'%d_%d',
+				$file['version'],
+				isset($setting['revision']) ? $setting['revision'] : 0
+			);
 		}
 		// manifestataion
 		elseif (isset($params['manifestation'])) {
