@@ -240,7 +240,7 @@ class Aws_lib
             $options = array(
                 'Bucket' => $bucket_name,
                 'Key' => $key,
-                'CopySource' => $source,
+                'CopySource' => implode('/', array_map('rawurlencode', explode('/', $source)))
             ) + $options;
 
             return $this->s3Client->copyObject($options);
