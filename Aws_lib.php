@@ -396,8 +396,7 @@ class Aws_lib
                     'Bucket' => '',
                     'Prefix' => '',
                 );
-                unset($config_array['ETag']);
-                unset($config_array['RequestId']);
+                unset($config_array['ETag'], $config_array['RequestId']);
                 $this->cfClient->updateDistribution($config_array);
             } catch (CloudFrontException $e) {
                 return $this->debug ? $e->getMessage() : false;
