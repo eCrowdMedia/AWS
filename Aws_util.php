@@ -153,6 +153,7 @@ class Aws_util {
 		$dry_run = false;
 		$use_quote = true;
 		$quite = true;
+		$use_awss3cli = isset($this->_config['eb_aws_s3']);
 		$no_mime_magic = true;
 		if (is_array($options)) {
 			foreach ($options as $key => $value) {
@@ -160,6 +161,9 @@ class Aws_util {
 					case 'mode':
 						if (in_array($value, ['sync', 'get', 'put', 'cp', 'mv'])) {
 							$mode = $value;
+							if ($use_awss3cli && in_array($value, ['get', 'put'])) {
+								$mode = 'cp';
+							}
 						}
 						if ($mode == 'put' && strpos($source, self::$_s3_protocol) === 0) {
 							return false;
@@ -168,31 +172,39 @@ class Aws_util {
 
 					case 'recursive':
 						if ($value) {
-							$args[] = '-r';
+							$args[] = $use_awss3cli ?
+								'--recursive' :
+								'-r';
 						}
 						break;
 
 					case 'reducedredundancy':
 						if ($value) {
-							$args[] = '--rr';
+							$args[] = $use_awss3cli ?
+								'--storage-class REDUCED_REDUNDANCY' :
+								'--rr';
 						}
 						break;
 
 					case 'public':
 						if ($value) {
-							$args[] = '-P';
+							$args[] = $use_awss3cli ?
+								'--acl public-read' :
+								'-P';
 						}
 						break;
 
 					case 'force':
-						if ($value) {
+						if ($value && $use_awss3cli) {
 							$args[] = '-f';
 						}
 						break;
 
 					case 'delete':
 						if ($value) {
-							$args[] = '--delete-removed';
+							$args[] = $use_awss3cli ?
+								'--delete' :
+								'--delete-removed';
 						}
 						break;
 
@@ -219,14 +231,18 @@ class Aws_util {
 		}
 
 		if ($quite) {
-			$args[] = '-q';
+			$args[] = $use_awss3cli ?
+				'--quiet' :
+				'-q';
 		}
 		if ($no_mime_magic) {
-			$args[] = '--no-mime-magic';
+			$args[] = $use_awss3cli ?
+				'--no-guess-mime-type' :
+				'--no-mime-magic';
 		}
 		$cmd = sprintf(
 			empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
-			$this->_config['cmd_s3cmd'],
+			$use_awss3cli ? $this->_config['eb_aws_s3'] : $this->_config['cmd_s3cmd'],
 			$mode,
 			implode(' ', $args),
 			$source,
@@ -251,7 +267,10 @@ class Aws_util {
 		$this->_CI->load->add_package_path(config_item('common_package'));
 		$this->_CI->load->library('process_lib');
 		$this->_CI->load->remove_package_path(config_item('common_package'));
-		return $this->_CI->process_lib->execute($this->_config['cmd_s3cmd'] . ' del -r ' . $s3_key);
+		$cmd = isset($this->_config['eb_aws_s3']) ?
+			($this->_config['eb_aws_s3'] . ' rm --recursive ') :
+			($this->_config['cmd_s3cmd'] . ' del -r ');
+		return $this->_CI->process_lib->execute($cmd . $s3_key);
 	}
 
 	private function _s3_key_ebook(array &$segments, array $params)
