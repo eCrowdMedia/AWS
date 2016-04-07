@@ -151,6 +151,7 @@ class Aws_util {
 		$args = [];
 		$mode = 'sync';
 		$dry_run = false;
+		$recursive = false;
 		$use_quote = true;
 		$quite = true;
 		$use_awss3cli = isset($this->_config['eb_aws_s3']);
@@ -171,11 +172,7 @@ class Aws_util {
 						break;
 
 					case 'recursive':
-						if ($value) {
-							$args[] = $use_awss3cli ?
-								'--recursive' :
-								'-r';
-						}
+						$recursive = $value;
 						break;
 
 					case 'reducedredundancy':
@@ -239,6 +236,11 @@ class Aws_util {
 			$args[] = $use_awss3cli ?
 				'--no-guess-mime-type' :
 				'--no-mime-magic';
+		}
+		if ($recursive && ( ! $use_awss3cli OR $mode != 'sync')) {
+			$args[] = $use_awss3cli ?
+				'--recursive' :
+				'-r';
 		}
 		$cmd = sprintf(
 			empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
