@@ -195,7 +195,7 @@ class Aws_util {
 						break;
 
 					case 'force':
-						if ($value && $use_awss3cli) {
+						if ($value && ! $use_awss3cli) {
 							$args[] = '-f';
 						}
 						break;
@@ -490,7 +490,7 @@ class Aws_util {
 		if (empty($params['less_than'])) {
 			$params['less_than'] = time() + config_item('sess_expiration');
 		}
-							
+
 		if ($use_custom_policy) {
 			$policy = $this->_get_custom_policy($params);
 
