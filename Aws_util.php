@@ -155,7 +155,7 @@ class Aws_util {
 		$use_quote = true;
 		$quite = true;
 		$use_awss3cli = isset($this->_config['eb_aws_s3']);
-		$no_mime_magic = true;
+		$no_mime_magic = ! $use_awss3cli;
 		if (is_array($options)) {
 			foreach ($options as $key => $value) {
 				switch (strtolower($key)) {
@@ -234,7 +234,7 @@ class Aws_util {
 		}
 		if ($no_mime_magic) {
 			$args[] = $use_awss3cli ?
-				'--no-guess-mime-type' :
+				'' :
 				'--no-mime-magic';
 		}
 		if ($recursive && ( ! $use_awss3cli OR $mode != 'sync')) {
