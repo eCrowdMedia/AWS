@@ -163,7 +163,6 @@ class Aws_lib
     public function deleteBucket($bucket_name)
     {
         try {
-            $this->_s3Client->clearBucket($bucket_name);
             $this->_s3Client->deleteBucket([
                 'Bucket' => $bucket_name,
             ]);
