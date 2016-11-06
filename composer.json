@@ -18,9 +18,9 @@
 	},
 	"require": {
 		"php":"~5.5 || ^7.0",
-		"composer/installers": "~1.0",
-		"aws/aws-sdk-php":"~2.8",
-		"ps/image-optimizer": "~1",
-		"ecrowdmedia/common": "dev-feature/ci3_php7"
+		"composer/installers": "^1.2",
+		"aws/aws-sdk-php":"^2.8.30",
+		"ps/image-optimizer": "^1.0.6",
+		"ecrowdmedia/common": "^1.14.9"
 	}
 }
