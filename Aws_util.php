@@ -394,6 +394,27 @@ class Aws_util {
 		}
 	}
 
+	private function _s3_key_doc(array &$segments, array $params)
+	{
+		$segments = [
+			self::$_s3_protocol . 'readmoo-doc-' . ENVIRONMENT,
+			'd',
+		];
+		if (isset($params['md'], $params['sha'])) {
+			$segments = array_merge(
+				$segments,
+				[
+					substr($params['md'], 0, 4),
+					substr($params['md'], 4, 4),
+					substr($params['md'], 8) . substr($params['sha'], -2),
+				]
+			);
+		}
+		elseif (isset($params['key'])) {
+			$segments[] = $params['key'];
+		}
+	}
+
 	public function s3_key(array $params, $mode = 'ebook', $use_cf = false, $trailing_slash = true)
 	{
 		$segments = [
@@ -408,6 +429,7 @@ class Aws_util {
 			case 'ebook':
 			case 'book':
 			case 'campaign':
+			case 'doc':
 				$function = '_s3_key_' . $mode;
 				$this->{$function}($segments, $params);
 				break;
