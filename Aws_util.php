@@ -496,14 +496,13 @@ class Aws_util {
 		$this->_config[$key] = $value;
 	}
 
-	public function set_signed_cookies(array $params)
+	private function _presign_process(array &$params)
 	{
 		if (empty($params['url']) OR
 			! preg_match('|^(http[s\*]?):\/\/([^\/]+)(\/.*)$|', $params['url'], $match)
 		) {
 			throw new Exception('Invalid parameters, no url found.', 400);
 		}
-		$key_id = $this->get_config('cf_keypair_id');
 		$use_custom_policy = strpos($match[3], '*') > 0;
 		$path = $use_custom_policy ?
 			substr($match[3], 0, strpos($match[3], '*')) :
@@ -512,27 +511,47 @@ class Aws_util {
 		if (empty($params['less_than'])) {
 			$params['less_than'] = time() + config_item('sess_expiration');
 		}
+		return [
+			$use_custom_policy,
+			$path,
+			$secure,
+			$use_custom_policy ?
+				$this->_get_custom_policy($params) :
+				$this->_get_canned_policy($params)
+		];
+	}
 
-		if ($use_custom_policy) {
-			$policy = $this->_get_custom_policy($params);
+	public function get_signed_url(array $params)
+	{
+		$url = $params['url'] . '?';
+		$params['url'] = str_replace('http://', 'http*://', $params['url']);
+		list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
+		$signature = $this->_safe_base64_encode($this->_sign($policy));
+		$query = [
+			'Expires' => $params['less_than'],
+			'Signature' => $signature,
+			'Key-Pair-Id' => $this->get_config('cf_keypair_id'),
+		];
+		return $url . http_build_query($query, null, ini_get('arg_separator.output'), PHP_QUERY_RFC3986);
+	}
 
+	public function set_signed_cookies(array $params)
+	{
+		list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
+
+		$use_custom_policy ?
 			$this->_set_cookie(
 				'Policy',
 				$this->_safe_base64_encode($policy),
 				$path,
 				$secure
-			);
-		}
-		else {
-			$policy = $this->_get_canned_policy($params);
-
+			) :
 			$this->_set_cookie(
 				'Expires',
 				$params['less_than'],
 				$path,
 				$secure
 			);
-		}
 
 		$this->_set_cookie(
 			'Signature',
@@ -543,7 +562,7 @@ class Aws_util {
 
 		$this->_set_cookie(
 			'Key-Pair-Id',
-			$key_id,
+			$this->get_config('cf_keypair_id'),
 			$path,
 			$secure
 		);
