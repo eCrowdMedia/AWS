@@ -621,7 +621,7 @@ class Aws_lib
     /**
      * @method Model receiveMessage(array $args = array()) {@command Sqs ReceiveMessage}
      */
-    public function receiveMessage($queueUrl, $maxNumberOfMessages = false, $visibilityTimeout = false, $waitTimeSeconds = false)
+    public function receiveMessage($queueUrl, $maxNumberOfMessages = null, $visibilityTimeout = null, $waitTimeSeconds = null, $attributeNames = null)
     {
         try {
             $params = [
@@ -629,14 +629,17 @@ class Aws_lib
                 'Attributes' => [
                 ],
             ];
-            if ($maxNumberOfMessages !== false) {
+            if ($maxNumberOfMessages !== null) {
                 $params['MaxNumberOfMessages'] = $maxNumberOfMessages;
             }
-            if ($visibilityTimeout !== false) {
+            if ($visibilityTimeout !== null) {
                 $params['VisibilityTimeout'] = $visibilityTimeout;
             }
-            if ($waitTimeSeconds !== false) {
+            if ($waitTimeSeconds !== null) {
                 $params['WaitTimeSeconds'] = $waitTimeSeconds;
+            }
+            if ($attributeNames !== null) {
+                $params['AttributeNames'] = $attributeNames;
             }
             $result = $this->sqsClient->receiveMessage($params);
 
