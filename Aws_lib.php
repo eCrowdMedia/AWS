@@ -303,12 +303,13 @@ class Aws_lib
     /**
      * @method Model listObjects(array $args = array()) {@command S3 ListObjects}
      */
-    public function listObjects($bucket_name, $prefix = '')
+    public function listObjects($bucket_name, $prefix = '', $max_keys = 1000)
     {
         try {
             return $this->s3Client->listObjects([
                 'Bucket' => $bucket_name,
                 'Prefix' => $prefix,
+                'MaxKeys' => $max_keys,
             ]);
         } catch (RuntimeException $e) {
             return $this->debug ? $e->getMessage() : false;
