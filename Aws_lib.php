@@ -14,6 +14,8 @@ use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
 use Aws\Sqs\Exception\SqsException;
 use Aws\DynamoDb\DynamoDbClient;
+use Aws\Batch\Exception;
+use Aws\Batch\BatchClient;
 
 class Aws_lib
 {
@@ -24,6 +26,8 @@ class Aws_lib
     private $_cfIdentity;
     private $_dynamoDbClient;
     private $_config;
+    private $_batchClient;
+    private $_job_def = 'job_def_tpl.json';
 
     public function __construct($config = [])
     {
@@ -40,6 +44,7 @@ class Aws_lib
         $this->_cfClient = $this->_sdk->createCloudFront();
         $this->_sqsClient = $this->_sdk->createSqs();
         $this->_dynamoDbClient = $this->_sdk->createDynamoDb();
+        $this->_batchClient = $this->_sdk->createBatch();
     }
 
     public function isBucketDnsCompatible($bucket_name)
@@ -772,6 +777,116 @@ class Aws_lib
      * @method Model setQueueAttributes(array $args = array()) {@command Sqs SetQueueAttributes}
      * @method ResourceIteratorInterface getListQueuesIterator(array $args = array()) The input array uses the parameters of the ListQueues operation
      */
+
+    
+    /**
+     * The following methods is used to interact with the **AWS Batch** service.
+     */
+    
+    public function describe_job_queues(array $jobQueues =[]){
+        try{
+            if(empty($jobQueues)){
+                return false;
+            }
+            return $this->_batchClient->describeJobQueues([
+                'jobQueues' => $jobQueues,
+               ]);
+        } catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    } 
+
+    public function register_job_definition(array $job_definition){
+        try {
+            return $this->_batchClient->registerJobDefinition($job_definition);
+        }catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function deregister_job_definition($job_definition){
+        try {
+            if(empty($job_definition)){
+                return false;
+            }
+            return $this->_batchClient->deregisterJobDefinition([
+                    'jobDefinition' => $job_definition
+                ]);
+        }catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function submit_job(array $job_definition){
+        try {
+            return $this->_batchClient->submitJob($job_definition);
+        }catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+
+    }
+
+    public function cancel_job($jobId, $reason){
+        try {
+            if(empty($jobId) || empty($reason)){
+                return false;
+            }
+            return $this->_batchClient->cancelJob([
+                'jobId' => $jobId, 
+                'reason' => $reason, 
+            ]);
+        } catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function terminate_job($jobId, $reason){
+        try {
+            if(empty($jobId) || empty($reason)){
+                return false;
+            }
+            return $this->_batchClient->terminateJob([
+                'jobId' => $jobId, 
+                'reason' => $reason, 
+            ]);
+        } catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function list_jobs($jobQueue, $jobStatus = 'RUNNING', $maxResults = 100, $nextToken = null){
+        try {
+            $status = ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING','RUNNING', 'SUCCEEDED', 'FAILED'];
+             
+            if(empty($jobQueue) || !in_array($jobStatus, $status)){
+                return false;
+            }
+            
+            return $this->_batchClient->listJobs([
+                'jobQueue' => $jobQueue,
+                'jobStatus' => $jobStatus,
+                'maxResults' => $maxResults,
+                'nextToken' => $nextToken,
+            ]);
+        } catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function describe_jobs(array $jobs = []){
+        try {
+            if(empty($jobs)){
+                return false;
+            }
+            return $this->_batchClient->describeJobs([
+                'jobs' => $jobs,
+            ]);
+        } catch (BatchException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+
 }
 // END Aws_lib Class
 
