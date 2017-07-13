@@ -27,17 +27,16 @@ class Aws_lib
     private $_dynamoDbClient;
     private $_config;
     private $_batchClient;
-    private $_job_def = 'job_def_tpl.json';
 
     public function __construct($config = [])
     {
         if (empty($config)) {
             $CI = &get_instance();
-            $aws_config = $CI->config->item('aws_v3');
+            $aws_config = $CI->config->item('aws');
             if (empty($aws_config)) {
-                $CI->config->load('aws_v3', true);
+                $CI->config->load('aws', true);
             }
-            $this->_config = $CI->config->item('aws_config', 'aws_v3');
+            $this->_config = $CI->config->item('aws_config', 'aws');
         }
         $this->_sdk = new Aws\Sdk($this->_config);
         $this->_s3Client = $this->_sdk->createS3();
@@ -334,45 +333,47 @@ class Aws_lib
         $origin_id = 'S3-'.$bucket_name;
 
         return [
-            'CallerReference' => md5(time()),
-            'Aliases' => [
-                'Quantity' => 1,
-                'Items' => [$domain_name],
-            ],
-            'DefaultRootObject' => 'index.html',
-            'Origins' => [
-                'Quantity' => 1,
-                'Items' => [
-                    [
-                        'Id' => $origin_id,
-                        'DomainName' => strtolower($bucket_name.'.s3.amazonaws.com'),
-                        'S3OriginConfig' => [
-                            'OriginAccessIdentity' => 'origin-access-identity/cloudfront/'.$this->_cfIdentity,
+            'DistributionConfig' => [
+                'CallerReference' => md5(time()),
+                'Aliases' => [
+                    'Quantity' => 1,
+                    'Items' => [$domain_name],
+                ],
+                'DefaultRootObject' => 'index.html',
+                'Origins' => [
+                    'Quantity' => 1,
+                    'Items' => [
+                        [
+                            'Id' => $origin_id,
+                            'DomainName' => strtolower($bucket_name.'.s3.amazonaws.com'),
+                            'S3OriginConfig' => [
+                                'OriginAccessIdentity' => 'origin-access-identity/cloudfront/'.$this->_cfIdentity,
+                            ],
                         ],
                     ],
                 ],
-            ],
-            'DefaultCacheBehavior' => [
-                'TargetOriginId' => $origin_id,
-                'ForwardedValues' => [
-                    'QueryString' => false,
+                'DefaultCacheBehavior' => [
+                    'TargetOriginId' => $origin_id,
+                    'ForwardedValues' => [
+                        'QueryString' => false,
+                    ],
+                    'TrustedSigners' => [
+                        'Enabled' => false,
+                        'Quantity' => 0,
+                        'Items' => [],
                 ],
-                'TrustedSigners' => [
+                    'ViewerProtocolPolicy' => ViewerProtocolPolicy::ALLOW_ALL,
+                    'MinTTL' => 0,
+                ],
+                'CacheBehaviors' => ['Quantity' => 0, 'Items' => []],
+                'Comment' => 'Distribution for '.$bucket_name,
+                'Logging' => [
                     'Enabled' => false,
-                    'Quantity' => 0,
-                    'Items' => [],
+                    'Bucket' => '',
+                    'Prefix' => '',
+                ],
+                'Enabled' => $enabled,
             ],
-                'ViewerProtocolPolicy' => ViewerProtocolPolicy::ALLOW_ALL,
-                'MinTTL' => 0,
-            ],
-            'CacheBehaviors' => ['Quantity' => 0, 'Items' => []],
-            'Comment' => 'Distribution for '.$bucket_name,
-            'Logging' => [
-                'Enabled' => false,
-                'Bucket' => '',
-                'Prefix' => '',
-            ],
-            'Enabled' => $enabled,
         ];
     }
 
@@ -405,10 +406,10 @@ class Aws_lib
     {
         try {
             $getDistribution = $this->_cfClient->getDistribution(['Id' => $cfID]);
-            $got_distribution_array = $getDistribution->toArray();
+            $got_distribution_array = $getDistribution['Distribution'];
             if ($got_distribution_array['Status'] == 'Deployed' and $got_distribution_array['DistributionConfig']['Enabled'] == false) {
                 try {
-                    $this->_cfClient->deleteDistribution(['Id' => $cfID, 'IfMatch' => $got_distribution_array['ETag']]);
+                    $this->_cfClient->deleteDistribution(['Id' => $cfID, 'IfMatch' => $getDistribution['ETag']]);
 
                     return true;
                 } catch (CloudFrontException $e) {
@@ -441,9 +442,10 @@ class Aws_lib
     {
         try {
             $distributions = $this->_cfClient->listDistributions();
+            $distributions = $distributions['DistributionList'];
             $result = [];
             if ($cname) {
-                foreach ($distributions->get('Items') as $distribution) {
+                foreach ($distributions['Items'] as $distribution) {
                     if ($distribution['Aliases']['Quantity'] > 1) {
                         foreach ($distribution['Aliases']['Items'] as $alias) {
                             if (preg_match(sprintf('/%s$/', $cname), $alias)) {
@@ -454,7 +456,7 @@ class Aws_lib
                     }
                 }
             } else {
-                $result = $distributions->get('Items');
+                $result = $distributions['Items'];
             }
 
             return $result;
@@ -476,11 +478,13 @@ class Aws_lib
 
                 return $this->_cfClient->createInvalidation([
                     'DistributionId' => $cfID,
-                    'Paths' => [
-                        'Quantity' => count($paths),
-                        'Items' => $paths,
+                    'InvalidationBatch' => [
+                        'Paths' => [
+                            'Quantity' => count($paths),
+                            'Items' => $paths,
+                        ],
+                        'CallerReference' => $caller_reference,
                     ],
-                    'CallerReference' => $caller_reference,
                 ]);
             }
         } catch (CloudFrontException $e) {

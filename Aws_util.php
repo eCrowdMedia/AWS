@@ -42,7 +42,7 @@ class Aws_util {
 			[
 				'eb_cli' => BASEPATH . 'cli.php'
 			],
-			$this->_load_config('aws_v3'),
+			$this->_load_config('aws'),
 			$config
 		);
 	}
