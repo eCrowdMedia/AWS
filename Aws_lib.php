@@ -858,7 +858,7 @@ class Aws_lib
         }
     }
 
-    public function list_jobs($jobQueue, $jobStatus = 'RUNNING', $maxResults = 100, $nextToken = null){
+    public function list_jobs($jobQueue, $jobStatus = null, $maxResults = null, $nextToken = null){
         try {
             $status = ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING','RUNNING', 'SUCCEEDED', 'FAILED'];
              
@@ -866,12 +866,21 @@ class Aws_lib
                 return false;
             }
             
-            return $this->_batchClient->listJobs([
-                'jobQueue' => $jobQueue,
-                'jobStatus' => $jobStatus,
-                'maxResults' => $maxResults,
-                'nextToken' => $nextToken,
-            ]);
+            $params = [
+               'jobQueue' => $jobQueue,
+            ];
+            if ($jobStatus != null ) {
+                $params['jobStatus'] = $jobStatus; # 不設定的話預設是取 RUNNING 
+            }
+            if ($maxResults != null) {
+                $params['maxResults'] = $maxResults; # 不設定的話預設是 100
+            }
+            if ($nextToken != null) {
+                $params['nextToken'] = $nextToken;
+            }
+          
+            return $this->_batchClient->listJobs($params);
+           
         } catch (BatchException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
