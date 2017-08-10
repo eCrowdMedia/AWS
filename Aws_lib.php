@@ -858,42 +858,42 @@ class Aws_lib
         }
     }
 
-    public function list_jobs($jobQueue, $jobStatus = null, $maxResults = null, $nextToken = null){
+    public function list_jobs($jobQueue, $jobStatus = 'RUNNING', $maxResults = 100, $nextToken = null){
         try {
             $status = ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING','RUNNING', 'SUCCEEDED', 'FAILED'];
              
             if(empty($jobQueue) || !in_array($jobStatus, $status)){
                 return false;
             }
+            return $this->_batchClient->listJobs([
+                'jobQueue' => $jobQueue, // REQUIRED
+                'jobStatus' => $jobStatus,
+                'maxResults' => $maxResults,
+                'nextToken' => $nextToken,
+            ]);
+
             
-            $params = [
-               'jobQueue' => $jobQueue,
-            ];
-            if ($jobStatus != null ) {
-                $params['jobStatus'] = $jobStatus; # 不設定的話預設是取 RUNNING 
-            }
-            if ($maxResults != null) {
-                $params['maxResults'] = $maxResults; # 不設定的話預設是 100
-            }
-            if ($nextToken != null) {
-                $params['nextToken'] = $nextToken;
-            }
-          
-            return $this->_batchClient->listJobs($params);
-           
         } catch (BatchException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
-
-    public function describe_jobs(array $jobs = []){
+    //$ids : A space-separated list of up to 100 job IDs.
+    public function describe_jobs(array $ids = []){
         try {
-            if(empty($jobs)){
+            if(empty($ids)){
                 return false;
             }
-            return $this->_batchClient->describeJobs([
-                'jobs' => $jobs,
-            ]);
+            $result = [];
+            $job_array = array_chunk($ids, 100); 
+            
+            foreach ($job_array as $item) {
+                $res = $this->_batchClient->describeJobs([
+                    'jobs' => $item, // REQUIRED
+                ]); 
+                $result = array_merge($result, $res['jobs']);                 
+            }
+
+           return $result;
         } catch (BatchException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
