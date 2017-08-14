@@ -14,7 +14,7 @@ use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
 use Aws\Sqs\Exception\SqsException;
 use Aws\DynamoDb\DynamoDbClient;
-use Aws\Batch\Exception;
+use Aws\Batch\Exception\BatchException;
 use Aws\Batch\BatchClient;
 
 class Aws_lib
@@ -788,115 +788,125 @@ class Aws_lib
      */
     
     public function describe_job_queues(array $jobQueues =[]){
-        try{
-            if(empty($jobQueues)){
-                return false;
-            }
-            return $this->_batchClient->describeJobQueues([
+        if(empty($jobQueues)){
+            return false;
+        }
+        try{  
+            $result =  $this->_batchClient->describeJobQueues([
                 'jobQueues' => $jobQueues,
                ]);
         } catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+             $result['error_msg'] = $e->getMessage();
         }
+        return $result;
     } 
 
     public function register_job_definition(array $job_definition){
         try {
-            return $this->_batchClient->registerJobDefinition($job_definition);
+            $result =  $this->_batchClient->registerJobDefinition($job_definition);
         }catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $result['error_msg'] = $e->getMessage();
         }
+        return $result;
     }
 
     public function deregister_job_definition($job_definition){
-        try {
-            if(empty($job_definition)){
-                return false;
-            }
-            return $this->_batchClient->deregisterJobDefinition([
+        if(empty($job_definition)){
+            return false;
+        }
+        try {  
+            $result = $this->_batchClient->deregisterJobDefinition([
                     'jobDefinition' => $job_definition
                 ]);
         }catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $result['error_msg'] = $e->getMessage();
         }
+        return $result;
     }
 
     public function submit_job(array $job_definition){
         try {
-            return $this->_batchClient->submitJob($job_definition);
+            $result = $this->_batchClient->submitJob($job_definition);
         }catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $result['error_msg'] = $e->getMessage();
         }
-
+        return $result;
     }
 
     public function cancel_job($jobId, $reason){
+        if (empty($jobId) || empty($reason)) {
+            return false;
+        }
         try {
-            if(empty($jobId) || empty($reason)){
-                return false;
-            }
-            return $this->_batchClient->cancelJob([
+            $result = $this->_batchClient->cancelJob([
                 'jobId' => $jobId, 
                 'reason' => $reason, 
             ]);
         } catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $result['error_msg'] = $e->getMessage();
         }
+        return $result;;
     }
 
     public function terminate_job($jobId, $reason){
+        if(empty($jobId) || empty($reason)){
+            return false;
+        }
+        
         try {
-            if(empty($jobId) || empty($reason)){
-                return false;
-            }
-            return $this->_batchClient->terminateJob([
+            $result = $this->_batchClient->terminateJob([
                 'jobId' => $jobId, 
                 'reason' => $reason, 
             ]);
         } catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $result['error_msg'] = $e->getMessage();
         }
+        return $result;
     }
 
     public function list_jobs($jobQueue, $jobStatus = 'RUNNING', $maxResults = 100, $nextToken = null){
-        try {
             $status = ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING','RUNNING', 'SUCCEEDED', 'FAILED'];
              
             if(empty($jobQueue) || !in_array($jobStatus, $status)){
                 return false;
             }
-            return $this->_batchClient->listJobs([
-                'jobQueue' => $jobQueue, // REQUIRED
-                'jobStatus' => $jobStatus,
-                'maxResults' => $maxResults,
-                'nextToken' => $nextToken,
-            ]);
-
-            
-        } catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
-        }
+            try {
+                $result = $this->_batchClient->listJobs([
+                    'jobQueue' => $jobQueue, // REQUIRED
+                    'jobStatus' => $jobStatus,
+                    'maxResults' => $maxResults,
+                    'nextToken' => $nextToken,
+                ]);
+            } catch (Exception $e) {
+                $result['error_msg'] = $e->getMessage();
+            }
+            return $result;
     }
+    
     //$ids : A space-separated list of up to 100 job IDs.
     public function describe_jobs(array $ids = []){
-        try {
-            if(empty($ids)){
-                return false;
-            }
-            $result = [];
-            $job_array = array_chunk($ids, 100); 
-            
-            foreach ($job_array as $item) {
+    
+        if(empty($ids)){
+            return false;
+        }
+        $result = [];
+        $job_array = array_chunk($ids, 101); 
+        
+        foreach ($job_array as $item) {
+            try {
                 $res = $this->_batchClient->describeJobs([
                     'jobs' => $item, // REQUIRED
                 ]); 
-                $result = array_merge($result, $res['jobs']);                 
+            } catch (BatchException $e) {
+                $result['error_msg'][] = $e->getMessage();
             }
 
-           return $result;
-        } catch (BatchException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            if(!empty($res)){
+                $result = array_merge($result, $res['jobs']);  
+            }                                         
         }
+       return $result;
+    
     }
 
 
