@@ -890,7 +890,7 @@ class Aws_lib
             return false;
         }
         $result = [];
-        $job_array = array_chunk($ids, 101); 
+        $job_array = array_chunk($ids, 100); 
         
         foreach ($job_array as $item) {
             try {
