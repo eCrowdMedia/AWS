@@ -310,6 +310,26 @@ class Aws_lib
     }
 
     /**
+     * Create a pre-signed URL for a request
+     *
+     * @param string $method get, post, head, put, delete
+     * @param int|string|\DateTime $expires The time at which the URL should expire.
+     *                                      This can be a Unix timestamp,
+     *                                      a PHP DateTime object,
+     *                                      or a string that can be evaluated by strtotime
+     * @return string
+     */
+    public function createPresignedUrl($method, $bucket, $key, $expires)
+    {
+        try {
+            $request = $this->s3Client->{strtolower($method)}("{$bucket}/{$key}");
+            return $this->s3Client->createPresignedUrl($request, $expires);
+        } catch (RuntimeException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    /**
      * [createDistribution description].
      *
      * @param [type] $bucket_name [description]
