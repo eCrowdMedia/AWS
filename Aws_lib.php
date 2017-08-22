@@ -782,16 +782,16 @@ class Aws_lib
      * @method ResourceIteratorInterface getListQueuesIterator(array $args = array()) The input array uses the parameters of the ListQueues operation
      */
 
-    
+
     /**
      * The following methods is used to interact with the **AWS Batch** service.
      */
-    
+
     public function describe_job_queues(array $jobQueues =[]){
         if(empty($jobQueues)){
             return false;
         }
-        try{  
+        try{
             $result =  $this->_batchClient->describeJobQueues([
                 'jobQueues' => $jobQueues,
                ]);
@@ -799,7 +799,7 @@ class Aws_lib
              $result['error_msg'] = $e->getMessage();
         }
         return $result;
-    } 
+    }
 
     public function register_job_definition(array $job_definition){
         try {
@@ -814,7 +814,7 @@ class Aws_lib
         if(empty($job_definition)){
             return false;
         }
-        try {  
+        try {
             $result = $this->_batchClient->deregisterJobDefinition([
                     'jobDefinition' => $job_definition
                 ]);
@@ -839,8 +839,8 @@ class Aws_lib
         }
         try {
             $result = $this->_batchClient->cancelJob([
-                'jobId' => $jobId, 
-                'reason' => $reason, 
+                'jobId' => $jobId,
+                'reason' => $reason,
             ]);
         } catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
@@ -852,11 +852,11 @@ class Aws_lib
         if(empty($jobId) || empty($reason)){
             return false;
         }
-        
+
         try {
             $result = $this->_batchClient->terminateJob([
-                'jobId' => $jobId, 
-                'reason' => $reason, 
+                'jobId' => $jobId,
+                'reason' => $reason,
             ]);
         } catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
@@ -866,7 +866,7 @@ class Aws_lib
 
     public function list_jobs($jobQueue, $jobStatus = 'RUNNING', $maxResults = 100, $nextToken = null){
             $status = ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING','RUNNING', 'SUCCEEDED', 'FAILED'];
-             
+
             if(empty($jobQueue) || !in_array($jobStatus, $status)){
                 return false;
             }
@@ -882,31 +882,31 @@ class Aws_lib
             }
             return $result;
     }
-    
+
     //$ids : A space-separated list of up to 100 job IDs.
     public function describe_jobs(array $ids = []){
-    
+
         if(empty($ids)){
             return false;
         }
         $result = [];
-        $job_array = array_chunk($ids, 100); 
-        
+        $job_array = array_chunk($ids, 100);
+
         foreach ($job_array as $item) {
             try {
                 $res = $this->_batchClient->describeJobs([
                     'jobs' => $item, // REQUIRED
-                ]); 
+                ]);
             } catch (BatchException $e) {
                 $result['error_msg'][] = $e->getMessage();
             }
 
             if(!empty($res)){
-                $result = array_merge($result, $res['jobs']);  
-            }                                         
+                $result = array_merge($result, $res['jobs']);
+            }
         }
        return $result;
-    
+
     }
 
 
