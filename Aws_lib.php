@@ -322,8 +322,12 @@ class Aws_lib
     public function createPresignedUrl($method, $bucket, $key, $expires)
     {
         try {
-            $request = $this->_s3Client->{strtolower($method)}("{$bucket}/{$key}");
-            return $this->_s3Client->createPresignedUrl($request, $expires);
+            $command = $this->_s3Client->getCommand(
+                ucfirst(strtolower($method)). 'Object',
+                ['Bucket' => $bucket, 'Key' => $key]
+            );
+            $request = $this->_s3Client->createPresignedRequest($command, $expires);
+            return (string)$request->getUri();
         } catch (RuntimeException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
