@@ -658,14 +658,14 @@ class Aws_util {
 				return header('HTTP/1.0 404 Not Found');
 			}
 			$args['ETag'] = $result->get('ETag');
-			$args['LastModified'] = $result->get('LastModified');
+			$args['LastModified'] = $result->get('LastModified')->format('D, d M Y H:i:s \G\M\T');
 			$args['ContentType'] = $result->get('ContentType');
 			$args['ContentLength'] = $result->get('ContentLength');
 		}
 		else {
 			$timestamp = filemtime($filename);
 			$args['ETag'] = '"' . md5('traditional chinese' . $timestamp) . '"';
-			$args['LastModified'] = gmdate('D, d M Y H:i:s ', $timestamp) . 'GMT';
+			$args['LastModified'] = gmdate('D, d M Y H:i:s \G\M\T', $timestamp);
 			$args['ContentType'] = null;
 			$args['ContentLength'] = filesize($filename);
 		}
