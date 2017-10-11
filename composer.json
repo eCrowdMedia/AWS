@@ -17,10 +17,11 @@
 		"email":"tech@readmoo.com"
 	},
 	"require": {
-		"php":"~5.5 || ^7.0",
+		"php":"^7.0",
 		"composer/installers": "^1.2",
 		"aws/aws-sdk-php":"^3.0.0",
 		"ps/image-optimizer": "^1.0.6",
-		"ecrowdmedia/common": "^1.28.0"
+		"ecrowdmedia/common": "^1.28.0",
+		"kint-php/kint": "^2.2"
 	}
 }
