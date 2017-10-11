@@ -22,7 +22,6 @@
 		"aws/aws-sdk-php":"^3.0.0",
 		"ps/image-optimizer": "^1.0.6",
 		"ecrowdmedia/common": "^1.28.0",
-		"aws/aws-php-sns-message-validator": "^1.4",
 		"kint-php/kint": "^2.2"
 	}
 }
