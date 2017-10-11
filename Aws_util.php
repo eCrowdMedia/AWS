@@ -652,7 +652,7 @@ class Aws_util {
 			if ( ! preg_match('|^s3://([^/]+)/(.+)$|', $filename, $match)) {
 				return header('HTTP/1.0 404 Not Found');
 			}
-			isset($this->_CI->aws_lib) OR $this->_CI->load->library('aws/aws_lib');
+			class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
 			$result = $this->_CI->aws_lib->headObject($match[1], $match[2], $args);
 			if (empty($result)) {
 				return header('HTTP/1.0 404 Not Found');
@@ -689,6 +689,35 @@ class Aws_util {
 
 		readfile($filename);
 		exit; // Prevent CodeIgniter's output buffer.
+	}
+
+	public function sms($phone, $message)
+	{
+		class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+		return $this->_CI->aws_lib->publish([
+			'PhoneNumber' => $phone,
+			'Message' => $message,
+		]);
+	}
+
+	public function publish($topic, $message, $subject = null)
+	{
+		class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+		return $this->_CI->aws_lib->publish([
+			'TopicArn' => $this->_config['sns_topic_prefix'] . $topic,
+			'Subject' => $subject,
+			'Message' => $message,
+		]);
+	}
+
+	public function subscribe($endpoint, $protocol, $topic)
+	{
+		class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+		return $this->_CI->aws_lib->subscribe(
+			$endpoint,
+			$protocol,
+			$this->_config['sns_topic_prefix'] . $topic
+		);
 	}
 }
 // END Aws_util Class

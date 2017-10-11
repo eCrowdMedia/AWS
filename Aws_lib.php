@@ -19,37 +19,42 @@ use Aws\Batch\BatchClient;
 
 class Aws_lib
 {
-    private $_sdk;
-    private $_s3Client;
-    private $_cfClient;
-    private $_sqsClient;
-    private $_cfIdentity;
-    private $_dynamoDbClient;
-    private $_config;
-    private $_batchClient;
+    private $_CI = null;
+    private $_sdk = null;
+    private $_s3Client = null;
+    private $_cfClient = null;
+    private $_sqsClient = null;
+    private $_cfIdentity = null;
+    private $_dynamoDbClient = null;
+    private $_config = null;
+    private $_batchClient = null;
+    private $_client_pool = [];
 
     public function __construct($config = [])
     {
         if (empty($config)) {
-            $CI = &get_instance();
-            $aws_config = $CI->config->item('aws');
+            $this->_CI = &get_instance();
+            $aws_config = $this->_CI->config->item('aws');
             if (empty($aws_config)) {
-                $CI->config->load('aws', true);
+                $this->_CI->config->load('aws', true);
             }
-            $this->_config = $CI->config->item('aws_config', 'aws');
+            $this->_config = $this->_CI->config->item('aws_config', 'aws');
         }
         $this->_sdk = new Aws\Sdk($this->_config);
-        $this->_s3Client = $this->_sdk->createS3();
-        $this->_cfClient = $this->_sdk->createCloudFront();
-        $this->_sqsClient = $this->_sdk->createSqs();
-        $this->_dynamoDbClient = $this->_sdk->createDynamoDb();
-        $this->_batchClient = $this->_sdk->createBatch();
+    }
+
+    private function _get_client($name)
+    {
+        if (!isset($this->_client_pool[$name])) {
+            $this->_client_pool[$name] = $this->_sdk->{'create' . $name}();
+        }
+        return $this->_client_pool[$name];
     }
 
     public function isBucketDnsCompatible($bucket_name)
     {
         try {
-            return $this->_s3Client->isBucketDnsCompatible($bucket_name) ? true : false;
+            return $this->_get_client('S3')->isBucketDnsCompatible($bucket_name) ? true : false;
         } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -58,7 +63,7 @@ class Aws_lib
     public function doesBucketExist($bucket_name)
     {
         try {
-            return $this->_s3Client->doesBucketExist($bucket_name) ? true : false;
+            return $this->_get_client('S3')->doesBucketExist($bucket_name) ? true : false;
         } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -69,24 +74,22 @@ class Aws_lib
      */
     public function createBucket($bucket_name)
     {
-        if ($this->isBucketDnsCompatible($bucket_name)) {
-            if ($this->doesBucketExist($bucket_name)) {
-                return false;
-            } else {
-                try {
-                    $this->_s3Client->createBucket(
-                    [
-                        'Bucket' => $bucket_name,
-                        'ACL' => 'public-read',
-                        //add more items if required here
-                    ]);
+        if (!$this->isBucketDnsCompatible($bucket_name)) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+        if ($this->doesBucketExist($bucket_name)) {
+            return false;
+        }
+        try {
+            $this->_get_client('S3')->createBucket(
+            [
+                'Bucket' => $bucket_name,
+                'ACL' => 'public-read',
+                //add more items if required here
+            ]);
 
-                    return true;
-                } catch (S3Exception $e) {
-                    return empty($this->_config['debug']) ? false : $e->getMessage();
-                }
-            }
-        } else {
+            return true;
+        } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
@@ -97,7 +100,7 @@ class Aws_lib
     public function headBucket($bucket_name)
     {
         try {
-            return $this->_s3Client->headBucket([
+            return $this->_get_client('S3')->headBucket([
                 'Bucket' => $bucket_name,
             ]);
         } catch (S3Exception $e) {
@@ -108,13 +111,13 @@ class Aws_lib
     /**
      * @method Model headObject(array $args = array()) {@command S3 HeadObject}
      */
-    public function headObject($bucket_name, $key, $args = [])
+    public function headObject($bucket_name, $key, array $args = [])
     {
         try {
             $args['Bucket'] = $bucket_name;
             $args['Key'] = $key;
 
-            return $this->_s3Client->headObject($args);
+            return $this->_get_client('S3')->headObject($args);
         } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -146,7 +149,7 @@ class Aws_lib
     {
         if ($this->doesBucketExist($bucket_name)) {
             try {
-                $this->_s3Client->putBucketPolicy(
+                $this->_get_client('S3')->putBucketPolicy(
                 [
                     'Bucket' => $bucket_name,
                     'Policy' => $this->_return_bucket_policy($bucket_name),
@@ -167,7 +170,7 @@ class Aws_lib
     public function deleteBucket($bucket_name)
     {
         try {
-            $this->_s3Client->deleteBucket([
+            $this->_get_client('S3')->deleteBucket([
                 'Bucket' => $bucket_name,
             ]);
 
@@ -180,7 +183,7 @@ class Aws_lib
     public function doesObjectExist($bucket_name, $key)
     {
         try {
-            return $this->_s3Client->doesObjectExist($bucket_name, $key) ? true : false;
+            return $this->_get_client('S3')->doesObjectExist($bucket_name, $key) ? true : false;
         } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -210,7 +213,7 @@ class Aws_lib
                 $options['ContentType'] = finfo_file($finfo, $options['SourceFile']);
             }
 
-            return $this->_s3Client->putObject($options);
+            return $this->_get_client('S3')->putObject($options);
         } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -234,7 +237,7 @@ class Aws_lib
                 'CopySource' => implode('/', array_map('rawurlencode', explode('/', $source))),
             ] + $options;
 
-            return $this->_s3Client->copyObject($options);
+            return $this->_get_client('S3')->copyObject($options);
         } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -246,7 +249,7 @@ class Aws_lib
     public function deleteObject($bucket_name, $s3key)
     {
         try {
-            $this->_s3Client->deleteObject([
+            $this->_get_client('S3')->deleteObject([
                 'Bucket' => $bucket_name,
                 'Key' => $s3key,
             ]);
@@ -263,7 +266,7 @@ class Aws_lib
     public function deleteObjects($bucket_name, $objects)
     {
         try {
-            $this->_s3Client->deleteObjects([
+            $this->_get_client('S3')->deleteObjects([
                 'Bucket' => $bucket_name,
                 'Delete' => [
                     'Objects' => $objects
@@ -282,7 +285,7 @@ class Aws_lib
     public function deleteMatchingObjects($bucket_name, $prefix = '', $regex = '', array $options = [])
     {
         try {
-            return $this->_s3Client->deleteMatchingObjects($bucket_name, $prefix, $regex, $options);
+            return $this->_get_client('S3')->deleteMatchingObjects($bucket_name, $prefix, $regex, $options);
         } catch (RuntimeException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -290,7 +293,7 @@ class Aws_lib
 
     public function registerStreamWrapper()
     {
-        return $this->_s3Client->registerStreamWrapper();
+        return $this->_get_client('S3')->registerStreamWrapper();
     }
 
     /**
@@ -299,7 +302,7 @@ class Aws_lib
     public function listObjects($bucket_name, $prefix = '', $max_keys = 1000)
     {
         try {
-            return $this->_s3Client->listObjects([
+            return $this->_get_client('S3')->listObjects([
                 'Bucket' => $bucket_name,
                 'Prefix' => $prefix,
                 'MaxKeys' => $max_keys,
@@ -322,11 +325,12 @@ class Aws_lib
     public function createPresignedUrl($method, $bucket, $key, $expires)
     {
         try {
-            $command = $this->_s3Client->getCommand(
+            $s3_client = $this->_get_client('S3');
+            $command = $s3_client->getCommand(
                 ucfirst(strtolower($method)). 'Object',
                 ['Bucket' => $bucket, 'Key' => $key]
             );
-            $request = $this->_s3Client->createPresignedRequest($command, $expires);
+            $request = $s3_client->createPresignedRequest($command, $expires);
             return (string)$request->getUri();
         } catch (RuntimeException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
@@ -344,7 +348,7 @@ class Aws_lib
     public function createDistribution($bucket_name, $domain_name)
     {
         try {
-            $return = $this->_cfClient->createDistribution($this->_return_distribution_config_array($bucket_name, $domain_name, true));
+            $return = $this->_get_client('CF')->createDistribution($this->_return_distribution_config_array($bucket_name, $domain_name, true));
 
             return $return->toArray();
         } catch (CloudFrontException $e) {
@@ -404,23 +408,20 @@ class Aws_lib
     public function disableDistribution($cfID)
     {
         try {
-            $getConfig = $this->_cfClient->getDistributionConfig(['Id' => $cfID]);
+            $cf_client = $this->_get_client('CF');
+            $getConfig = $cf_client->getDistributionConfig(['Id' => $cfID]);
             $got_config_array = $getConfig->toArray();
-            try {
-                $config_array = $got_config_array;
-                $config_array['Enabled'] = false;
-                $config_array['Id'] = $cfID;
-                $config_array['IfMatch'] = $got_config_array['ETag'];
-                $config_array['Logging'] = [
-                    'Enabled' => false,
-                    'Bucket' => '',
-                    'Prefix' => '',
-                ];
-                unset($config_array['ETag'], $config_array['RequestId']);
-                $this->_cfClient->updateDistribution($config_array);
-            } catch (CloudFrontException $e) {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
-            }
+            $config_array = $got_config_array;
+            $config_array['Enabled'] = false;
+            $config_array['Id'] = $cfID;
+            $config_array['IfMatch'] = $got_config_array['ETag'];
+            $config_array['Logging'] = [
+                'Enabled' => false,
+                'Bucket' => '',
+                'Prefix' => '',
+            ];
+            unset($config_array['ETag'], $config_array['RequestId']);
+            $cf_client->updateDistribution($config_array);
         } catch (CloudFrontException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -429,18 +430,14 @@ class Aws_lib
     public function deleteDistribution($cfID)
     {
         try {
-            $getDistribution = $this->_cfClient->getDistribution(['Id' => $cfID]);
+            $cf_client = $this->_get_client('CF');
+            $getDistribution = $cf_client->getDistribution(['Id' => $cfID]);
             $got_distribution_array = $getDistribution['Distribution'];
             if ($got_distribution_array['Status'] == 'Deployed' and $got_distribution_array['DistributionConfig']['Enabled'] == false) {
-                try {
-                    $this->_cfClient->deleteDistribution(['Id' => $cfID, 'IfMatch' => $getDistribution['ETag']]);
-
-                    return true;
-                } catch (CloudFrontException $e) {
-                    return empty($this->_config['debug']) ? false : $e->getMessage();
-                }
+                $cf_client->deleteDistribution(['Id' => $cfID, 'IfMatch' => $getDistribution['ETag']]);
+                return true;
             } else {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
+                return false;
             }
         } catch (CloudFrontException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
@@ -453,7 +450,7 @@ class Aws_lib
     public function getDistribution($cfID)
     {
         try {
-            return $this->_cfClient->getDistribution(['Id' => $cfID]);
+            return $this->_get_client('CF')->getDistribution(['Id' => $cfID]);
         } catch (CloudFrontException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -465,7 +462,7 @@ class Aws_lib
     public function listDistributions($cname = false)
     {
         try {
-            $distributions = $this->_cfClient->listDistributions();
+            $distributions = $this->_get_client('CF')->listDistributions();
             $distributions = $distributions['DistributionList'];
             $result = [];
             if ($cname) {
@@ -500,7 +497,7 @@ class Aws_lib
             } elseif (empty($caller_reference)) {
                 $caller_reference = rtrim(base64_encode(sha1(implode("\x01", $paths).date('Y-m-d H:i:s'))), '=');
 
-                return $this->_cfClient->createInvalidation([
+                return $this->_get_client('CF')->createInvalidation([
                     'DistributionId' => $cfID,
                     'InvalidationBatch' => [
                         'Paths' => [
@@ -554,7 +551,7 @@ class Aws_lib
             if (is_array($attributes)) {
                 $params['Attributes'] = $attributes;
             }
-            $result = $this->_sqsClient->createQueue($params);
+            $result = $this->_get_client('Sqs')->createQueue($params);
 
             return $result->get('QueueUrl');
         } catch (SqsException $e) {
@@ -574,7 +571,7 @@ class Aws_lib
             if (!empty($queueOwnerAWSAccountId)) {
                 $params['QueueOwnerAWSAccountId'] = $queueOwnerAWSAccountId;
             }
-            $result = $this->_sqsClient->getQueueUrl($params);
+            $result = $this->_get_client('Sqs')->getQueueUrl($params);
 
             return $result->get('QueueUrl');
         } catch (SqsException $e) {
@@ -588,7 +585,7 @@ class Aws_lib
     public function listQueues($queueNamePrefix = false)
     {
         try {
-            $result = $this->_sqsClient->listQueues(
+            $result = $this->_get_client('Sqs')->listQueues(
                 empty($queueNamePrefix) ?
                     [] :
                     ['QueueNamePrefix' => ENVIRONMENT.'_'.$queueNamePrefix]
@@ -613,7 +610,7 @@ class Aws_lib
             if ($delaySeconds !== false) {
                 $params[QueueAttribute::DELAY_SECONDS] = $delaySeconds;
             }
-            $result = $this->_sqsClient->sendMessage($params);
+            $result = $this->_get_client('Sqs')->sendMessage($params);
             if ($result->get('MD5OfMessageBody') == md5($messageBody)) {
                 return $result->get('MessageId');
             } else {
@@ -635,7 +632,7 @@ class Aws_lib
                 'Entries' => $entries,
             ];
 
-            return $this->_sqsClient->sendMessageBatch($params);
+            return $this->_get_client('Sqs')->sendMessageBatch($params);
         } catch (SqsException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -664,7 +661,7 @@ class Aws_lib
             if ($attributeNames !== null) {
                 $params['AttributeNames'] = $attributeNames;
             }
-            $result = $this->_sqsClient->receiveMessage($params);
+            $result = $this->_get_client('Sqs')->receiveMessage($params);
 
             return $result->get('Messages');
         } catch (SqsException $e) {
@@ -678,12 +675,10 @@ class Aws_lib
     public function deleteMessage($queueUrl, $receiptHandle)
     {
         try {
-            $result = $this->_sqsClient->deleteMessage([
+            return $this->_get_client('Sqs')->deleteMessage([
                 'QueueUrl' => $queueUrl,
                 'ReceiptHandle' => $receiptHandle,
             ]);
-
-            return $result;
         } catch (SqsException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -695,13 +690,11 @@ class Aws_lib
     public function changeMessageVisibility($queueUrl, $receiptHandle, $visibilityTimeout)
     {
         try {
-            $result = $this->_sqsClient->changeMessageVisibility([
+            return $this->_get_client('Sqs')->changeMessageVisibility([
                 'QueueUrl' => $queueUrl,
                 'ReceiptHandle' => $receiptHandle,
                 'VisibilityTimeout' => $visibilityTimeout,
             ]);
-
-            return $result;
         } catch (SqsException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -713,7 +706,7 @@ class Aws_lib
     public function changeMessageVisibilityBatch($queueUrl, $entries)
     {
         try {
-            return $this->_sqsClient->changeMessageVisibilityBatch([
+            return $this->_get_client('Sqs')->changeMessageVisibilityBatch([
                 'QueueUrl' => $queueUrl,
                 'Entries' => $entries,
             ]);
@@ -728,7 +721,7 @@ class Aws_lib
     public function deleteMessageBatch($queueUrl, $entries)
     {
         try {
-            return $this->_sqsClient->deleteMessageBatch([
+            return $this->_get_client('Sqs')->deleteMessageBatch([
                 'QueueUrl' => $queueUrl,
                 'Entries' => $entries,
             ]);
@@ -740,7 +733,7 @@ class Aws_lib
     public function putItem(array $params = [])
     {
         try {
-            return $this->_dynamoDbClient->putItem($params);
+            return $this->_get_client('DynamoDb')->putItem($params);
         } catch (DynamoDbException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -749,7 +742,7 @@ class Aws_lib
     public function queryItem(array $params = [])
     {
         try {
-            return $this->_dynamoDbClient->query($params);
+            return $this->_get_client('DynamoDb')->query($params);
         } catch (DynamoDbException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -758,7 +751,7 @@ class Aws_lib
     public function getIterator($type, array $params = [])
     {
         try {
-            return $this->_dynamoDbClient->getIterator($type, $params);
+            return $this->_get_client('DynamoDb')->getIterator($type, $params);
         } catch (DynamoDbException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -767,7 +760,7 @@ class Aws_lib
     public function queryBatchItem(array $params = [])
     {
         try {
-            return $this->_dynamoDbClient->batchGetItem($params);
+            return $this->_get_client('DynamoDb')->batchGetItem($params);
         } catch (DynamoDbException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -781,7 +774,7 @@ class Aws_lib
             ];
         try {
             do {
-                $response = $this->_dynamoDbClient->scan($params);
+                $response = $this->_get_client('DynamoDb')->scan($params);
                 $items = $response->get('Items');
                 $result['items'] = array_merge($result['items'], $items);
                 $result['count'] += count($items);
@@ -816,7 +809,7 @@ class Aws_lib
             return false;
         }
         try{
-            $result =  $this->_batchClient->describeJobQueues([
+            $result = $this->_get_client('Batch')->describeJobQueues([
                 'jobQueues' => $jobQueues,
                ]);
         } catch (BatchException $e) {
@@ -827,7 +820,7 @@ class Aws_lib
 
     public function register_job_definition(array $job_definition){
         try {
-            $result =  $this->_batchClient->registerJobDefinition($job_definition);
+            $result =  $this->_get_client('Batch')->registerJobDefinition($job_definition);
         }catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
         }
@@ -839,7 +832,7 @@ class Aws_lib
             return false;
         }
         try {
-            $result = $this->_batchClient->deregisterJobDefinition([
+            $result = $this->_get_client('Batch')->deregisterJobDefinition([
                     'jobDefinition' => $job_definition
                 ]);
         }catch (BatchException $e) {
@@ -850,7 +843,7 @@ class Aws_lib
 
     public function submit_job(array $job_definition){
         try {
-            $result = $this->_batchClient->submitJob($job_definition);
+            $result = $this->_get_client('Batch')->submitJob($job_definition);
         }catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
         }
@@ -862,7 +855,7 @@ class Aws_lib
             return false;
         }
         try {
-            $result = $this->_batchClient->cancelJob([
+            $result = $this->_get_client('Batch')->cancelJob([
                 'jobId' => $jobId,
                 'reason' => $reason,
             ]);
@@ -878,7 +871,7 @@ class Aws_lib
         }
 
         try {
-            $result = $this->_batchClient->terminateJob([
+            $result = $this->_get_client('Batch')->terminateJob([
                 'jobId' => $jobId,
                 'reason' => $reason,
             ]);
@@ -895,7 +888,7 @@ class Aws_lib
                 return false;
             }
             try {
-                $result = $this->_batchClient->listJobs([
+                $result = $this->_get_client('Batch')->listJobs([
                     'jobQueue' => $jobQueue, // REQUIRED
                     'jobStatus' => $jobStatus,
                     'maxResults' => $maxResults,
@@ -908,9 +901,9 @@ class Aws_lib
     }
 
     //$ids : A space-separated list of up to 100 job IDs.
-    public function describe_jobs(array $ids = []){
-
-        if(empty($ids)){
+    public function describe_jobs(array $ids)
+    {
+        if (empty($ids)) {
             return false;
         }
         $result = [];
@@ -918,7 +911,7 @@ class Aws_lib
 
         foreach ($job_array as $item) {
             try {
-                $res = $this->_batchClient->describeJobs([
+                $res = $this->_get_client('Batch')->describeJobs([
                     'jobs' => $item, // REQUIRED
                 ]);
             } catch (BatchException $e) {
@@ -933,7 +926,144 @@ class Aws_lib
 
     }
 
+    /*
+     * @method \Aws\Result publish(array $args = [])
+     * Each SMS message can contain up to 140 bytes,
+     * and the character limit depends on the encoding scheme.
+     * For example, an SMS message can contain:
+     * - 160 GSM characters
+     * - 140 ASCII characters
+     * - 70 UCS-2 characters
+     */
+    public function publish(array $params)
+    {
+        try {
+            if (empty($params['Message'])) {
+                throw new Exception('Missing parameter, "Message" is required.', 500);
+            }
+            if ($this->_valid_json($params['Message'])) {
+                $params['MessageStructure'] = 'json';
+            }
+            if (!$this->_valid_arn($params)) {
+                throw new Exception('Invalid parameter, only one of "PhoneNumber", "TargetArn", "TopicArn" should exist', 500);
+            }
+            if (isset($params['PhoneNumber'])) {
+                if (!$this->_valid_E164($params['PhoneNumber'])) {
+                    throw new Exception('PhoneNumber should use E.164 format.', 500);
+                }
+            }
+            if (isset($params['Subject']) &&
+                !$this->_valid_subject($params['Subject'])
+            ) {
+                throw new Exception('Subject format is invalid.', 500);
+            }
+            $result = $this->_get_client('Sns')->publish($params);
+            return $result['MessageId'];
+        } catch (Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
 
+    private function _valid_json($json)
+    {
+        if (is_string($json)) {
+            $json = @json_decode($json, true);
+            return json_last_error() === JSON_ERROR_NONE &&
+                isset($json['default']);
+        }
+    }
+
+    private function _valid_E164($phone)
+    {
+        return preg_match('/^\+?[1-9]\d{1,14}$/', $phone);
+    }
+
+    private function _valid_subject($subject)
+    {
+        return true;
+        return preg_match('/^[\w:punct:][^\v]{0,99}$/', $subject);
+    }
+
+    private function _valid_arn(array $params)
+    {
+        $count = 0;
+        if (isset($params['PhoneNumber'])) {
+            ++$count;
+        }
+        if (isset($params['TargetArn'])) {
+            ++$count;
+        }
+        if (isset($params['TopicArn'])) {
+            ++$count;
+        }
+        return $count === 1;
+    }
+
+    public function subscribe($endpoint, $protocol, $topic_arn)
+    {
+        try {
+            $this->_valid_endpoint($endpoint, $protocol);
+        } catch (Exception $e) {
+            throw new Exception('Endpoint format is not ' . $e->getMessage(), $e->getCode());
+        }
+        try {
+            $result = $this->_get_client('Sns')->subscribe([
+                'Endpoint' => $endpoint,
+                'Protocol' => $protocol,
+                'TopicArn' => $topic_arn,
+            ]);
+            return $result['SubscriptionArn'];
+        } catch (Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function unsubscribe($subscription_arn)
+    {
+        try {
+
+        } catch (Exception $e) {
+
+        }
+    }
+
+    private function _valid_endpoint($endpoint, $protocol)
+    {
+        switch ($protocol) {
+            case 'http':
+            case 'https':
+                if (strpos($endpoint, $protocol . '://') !== 0) {
+                    throw new Exception($protocol, 500);
+                }
+                break;
+            case 'email':
+            case 'email-json':
+                $this->_CI->load->helper('email');
+                if (!valid_email($endpoint)) {
+                    throw new Exception('email', 500);
+                }
+                break;
+            case 'sms':
+                if (!$this->_valid_E164($endpoint)) {
+                    throw new Exception('E.164', 500);
+                }
+                break;
+            case 'sqs':
+            case 'lambda':
+                if (strpos($endpoint, 'arn:aws:' . $protocol) !== 0) {
+                    throw new Exception('ARN', 500);
+                }
+                break;
+            case 'application':
+                if (strpos($endpoint, 'arn:aws:sns') !== 0) {
+                    throw new Exception('ARN', 500);
+                }
+                break;
+            default:
+                throw new Exception('unknown', 500);
+                break;
+        }
+    }
 }
 // END Aws_lib Class
 
