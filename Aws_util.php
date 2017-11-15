@@ -703,8 +703,9 @@ class Aws_util {
 	public function publish($topic, $message, $subject = null)
 	{
 		class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+		$prefix = $this->_config['sns_topic_prefix'];
 		return $this->_CI->aws_lib->publish([
-			'TopicArn' => $this->_config['sns_topic_prefix'] . $topic,
+			'TopicArn' => (strpos($topic, $prefix) === 0 ? '' : $prefix) . $topic,
 			'Subject' => $subject,
 			'Message' => $message,
 		]);
@@ -713,13 +714,68 @@ class Aws_util {
 	public function subscribe($endpoint, $protocol, $topic)
 	{
 		class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+		$prefix = $this->_config['sns_topic_prefix'];
 		return $this->_CI->aws_lib->subscribe(
 			$endpoint,
 			$protocol,
-			$this->_config['sns_topic_prefix'] . $topic
+			(strpos($topic, $prefix) === 0 ? '' : $prefix) . $topic
 		);
+	}
+
+	public function list_topics($prefix = null)
+	{
+		static $next_token = null;
+		$result = [];
+		if (!empty($prefix) &&
+			strpos($prefix, $this->_config['sns_topic_prefix']) !== 0
+		) {
+			$prefix = $this->_config['sns_topic_prefix'] . $prefix;
+		}
+		class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+		do {
+			$list = $this->_CI->aws_lib->listTopics($next_token);
+			if (empty($prefix)) {
+				empty($list['Topics']) or array_push(
+					$result,
+					array_column($list['Topics'], 'TopicArn'))
+				;
+			} else {
+				empty($list['Topics']) or array_walk(
+					$list['Topics'],
+					function($topic) use (&$result, $prefix) {
+						if (strpos($topic['TopicArn'], $prefix) === 0) {
+							$result[] = $topic['TopicArn'];
+						}
+					}
+				);
+			}
+			$next_token = $list['NextToken'] ?? null;
+		} while ($next_token != null);
+		return $result;
+	}
+
+	public function list_subscriptions_by_topic($topic, $next_token = null)
+	{
+		class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+		$prefix = $this->_config['sns_topic_prefix'];
+		$topic_arn = (strpos($topic, $prefix) === 0 ? '' : $prefix) . $topic;
+		if ($next_token === true) {
+			$result = [];
+			$next_token = null;
+		}
+		do {
+			$list = $this->_CI->aws_lib->listSubscriptionsByTopic($topic_arn, $next_token);
+			if (!isset($result)) {
+				return $list;
+			}
+			array_push(
+				$result,
+				array_column($list['Subscriptions'], null, 'SubscriptionArn')
+			);
+			$next_token = $list['NextToken'] ?? null;
+		} while ($next_token != null);
+		return $result;
 	}
 }
 // END Aws_util Class
-
 /* End of file Aws_util.php */

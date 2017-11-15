@@ -1064,6 +1064,29 @@ class Aws_lib
                 break;
         }
     }
+
+    public function listTopics($next_token = null)
+    {
+        try {
+            $params = empty($next_token) ? [] : ['NextToken' => $next_token];
+            return $this->_get_client('Sns')->listTopics($params);
+        } catch (Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function listSubscriptionsByTopic($topic_arn, $next_token = null)
+    {
+        try {
+            $params = [
+                'NextToken' => $next_token,
+                'TopicArn' => $topic_arn,
+            ];
+            return $this->_get_client('Sns')->listSubscriptionsByTopic($params);
+        } catch (Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
 }
 // END Aws_lib Class
 
