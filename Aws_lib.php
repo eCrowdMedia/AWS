@@ -315,7 +315,7 @@ class Aws_lib
     /**
      * Create a pre-signed URL for a request
      *
-     * @param string $method get, post, head, put, delete
+     * @param string $method get, head, put, delete
      * @param int|string|\DateTime $expires The time at which the URL should expire.
      *                                      This can be a Unix timestamp,
      *                                      a PHP DateTime object,
@@ -1060,7 +1060,7 @@ class Aws_lib
                 }
                 break;
             default:
-                throw new Exception('unknown', 500);
+                throw new Exception('valid protocol: ' . $protocol, 500);
                 break;
         }
     }
