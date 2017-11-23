@@ -322,13 +322,13 @@ class Aws_lib
      *                                      or a string that can be evaluated by strtotime
      * @return string
      */
-    public function createPresignedUrl($method, $bucket, $key, $expires)
+    public function createPresignedUrl($method, $bucket, $key, $expires, array $options = [])
     {
         try {
             $s3_client = $this->_get_client('S3');
             $command = $s3_client->getCommand(
                 ucfirst(strtolower($method)). 'Object',
-                ['Bucket' => $bucket, 'Key' => $key]
+                ['Bucket' => $bucket, 'Key' => $key] + $options
             );
             $request = $s3_client->createPresignedRequest($command, $expires);
             return (string)$request->getUri();
