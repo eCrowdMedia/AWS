@@ -227,6 +227,24 @@ class Aws_util {
 						$no_mime_magic = $value;
 						break;
 
+					case 'cache':
+						if ($value) {
+							$args[] = ($use_awss3cli ?
+								'--cache-control ' :
+								'--add-header=Cache-control:') . $value;
+						}
+						break;
+
+					case 'type':
+						if ($value) {
+							$args[] = sprintf(
+								'--content-type%s%s',
+								$use_awss3cli ? ' ' : '=',
+								$value
+							);
+						}
+						break;
+
 					default:
 						break;
 				}
