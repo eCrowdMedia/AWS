@@ -348,7 +348,7 @@ class Aws_lib
     public function createDistribution($bucket_name, $domain_name)
     {
         try {
-            $return = $this->_get_client('CF')->createDistribution($this->_return_distribution_config_array($bucket_name, $domain_name, true));
+            $return = $this->_get_client('CloudFront')->createDistribution($this->_return_distribution_config_array($bucket_name, $domain_name, true));
 
             return $return->toArray();
         } catch (CloudFrontException $e) {
@@ -408,7 +408,7 @@ class Aws_lib
     public function disableDistribution($cfID)
     {
         try {
-            $cf_client = $this->_get_client('CF');
+            $cf_client = $this->_get_client('CloudFront');
             $getConfig = $cf_client->getDistributionConfig(['Id' => $cfID]);
             $got_config_array = $getConfig->toArray();
             $config_array = $got_config_array;
@@ -430,7 +430,7 @@ class Aws_lib
     public function deleteDistribution($cfID)
     {
         try {
-            $cf_client = $this->_get_client('CF');
+            $cf_client = $this->_get_client('CloudFront');
             $getDistribution = $cf_client->getDistribution(['Id' => $cfID]);
             $got_distribution_array = $getDistribution['Distribution'];
             if ($got_distribution_array['Status'] == 'Deployed' and $got_distribution_array['DistributionConfig']['Enabled'] == false) {
@@ -450,7 +450,7 @@ class Aws_lib
     public function getDistribution($cfID)
     {
         try {
-            return $this->_get_client('CF')->getDistribution(['Id' => $cfID]);
+            return $this->_get_client('CloudFront')->getDistribution(['Id' => $cfID]);
         } catch (CloudFrontException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
@@ -462,7 +462,7 @@ class Aws_lib
     public function listDistributions($cname = false)
     {
         try {
-            $distributions = $this->_get_client('CF')->listDistributions();
+            $distributions = $this->_get_client('CloudFront')->listDistributions();
             $distributions = $distributions['DistributionList'];
             $result = [];
             if ($cname) {
@@ -497,7 +497,7 @@ class Aws_lib
             } elseif (empty($caller_reference)) {
                 $caller_reference = rtrim(base64_encode(sha1(implode("\x01", $paths).date('Y-m-d H:i:s'))), '=');
 
-                return $this->_get_client('CF')->createInvalidation([
+                return $this->_get_client('CloudFront')->createInvalidation([
                     'DistributionId' => $cfID,
                     'InvalidationBatch' => [
                         'Paths' => [
