@@ -737,6 +737,34 @@ class Aws_util {
 			$this->_config['sns_topic_prefix'] . $topic
 		);
 	}
+
+	public function s3_list($bucket, $prefix, $list_filename, array $filters = ['sed' => '/Thumbs\.db|\.DS_STORE/d'])
+	{
+		$this->_CI->load->add_package_path(config_item('common_package'));
+		$this->_CI->load->library('process_lib');
+		$this->_CI->load->remove_package_path(config_item('common_package'));
+        $cmd = sprintf(
+            'aws s3 ls --recursive --summarize s3://%s/%s/ ',
+            $bucket,
+            $prefix
+        );
+
+    	foreach ($filters as $key => $pattern) {
+    		$cmd .= sprintf(
+    			'| %s "%s" ',
+    			$key,
+    			$pattern
+    		);
+    	}
+    	$cmd .= '> ' . $list_filename;
+
+        set_time_limit(0);
+        $credentials = $this->_config['aws_config']['credentials'] ?? null;
+        isset($credentials['key']) && putenv('AWS_ACCESS_KEY_ID=' . $credentials['key']);
+        isset($credentials['secret']) && putenv('AWS_SECRET_ACCESS_KEY=' . $credentials['secret']);
+        $this->_CI->process_lib->execute($cmd);
+        return $list_filename;
+	}
 }
 // END Aws_util Class
 
