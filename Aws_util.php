@@ -441,12 +441,11 @@ class Aws_util {
 
     private function _s3_key_epub($mode, array &$segments, array $params)
     {
-        $this->_CI->load->helper('url');
         $segments = [
-            self::$_s3_protocol . preg_replace(
-                '|.+(\.readmoo\..+)$|',
-                'epub$1',
-                $_SERVER['CF_URL'] ?? base_url()
+            sprintf(
+                '%sepub.readmoo.%s',
+                self::$_s3_protocol,
+                ENVIRONMENT == 'production' ? 'com' : 'tw'
             ),
             $mode[0],
         ];
