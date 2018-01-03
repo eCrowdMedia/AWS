@@ -31,7 +31,7 @@
 */
 class Aws_util {
     private static $_s3_protocol = 's3://';
-    private static $_priv_key_id = null;
+    private static $_priv_key = null;
     private $_CI = false;
     private $_config = false;
 
@@ -49,7 +49,7 @@ class Aws_util {
 
     function __destruct()
     {
-        empty(self::$_priv_key_id) or openssl_free_key(self::$_priv_key_id);
+        empty(self::$_priv_key) or openssl_free_key(self::$_priv_key);
     }
 
     public function add_task($task)
@@ -661,11 +661,11 @@ class Aws_util {
 
     private function _sign($data)
     {
-        if (empty(self::$_priv_key_id)) {
-            self::$_priv_key_id = openssl_get_privatekey('file://' . $this->get_config('cf_pk_pathname'));
+        if (empty(self::$_priv_key)) {
+            self::$_priv_key = openssl_get_privatekey('file://' . $this->get_config('cf_pk_pathname'));
         }
         $signature = null;
-        openssl_sign($data, $signature, self::$_priv_key_id);
+        openssl_sign($data, $signature, self::$_priv_key);
 
         return $signature;
     }
