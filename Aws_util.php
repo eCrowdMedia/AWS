@@ -439,6 +439,16 @@ class Aws_util {
         }
     }
 
+    private function _s3_key_api(array &$segments, array $params)
+    {
+        array_unshift($params, sprintf(
+            '%sapi.readmoo.%s',
+            self::$_s3_protocol,
+            ENVIRONMENT == 'production' ? 'com' : 'tw'
+        ));
+        $segments = $params;
+    }
+
     private function _s3_key_epub($mode, array &$segments, array $params)
     {
         $segments = [
@@ -476,6 +486,7 @@ class Aws_util {
             case 'book':
             case 'campaign':
             case 'doc':
+            case 'api':
                 $function = '_s3_key_' . $mode;
                 $this->{$function}($segments, $params);
                 break;
