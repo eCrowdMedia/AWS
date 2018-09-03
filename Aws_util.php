@@ -713,7 +713,7 @@ class Aws_util {
                 return header('HTTP/1.0 404 Not Found');
             }
             $args['ETag'] = $result->get('ETag');
-            $args['LastModified'] = $result->get('LastModified')->format('D, d M Y H:i:s \G\M\T');
+            $args['LastModified'] = $result->get('LastModified') ? $result->get('LastModified')->format('D, d M Y H:i:s \G\M\T') : null;
             $args['ContentType'] = $result->get('ContentType');
             $args['ContentLength'] = $result->get('ContentLength');
         }
