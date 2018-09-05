@@ -584,12 +584,12 @@ class Aws_lib
      */
     public function listQueues($queueNamePrefix = false)
     {
+        $params = [];
+        if (!empty($queueNamePrefix)) {
+            $params['QueueNamePrefix'] = strpos($queueNamePrefix, ENVIRONMENT) === 0 ? $queueNamePrefix : (ENVIRONMENT.'_'.$queueNamePrefix);
+        }
         try {
-            $result = $this->_get_client('Sqs')->listQueues(
-                empty($queueNamePrefix) ?
-                    [] :
-                    ['QueueNamePrefix' => ENVIRONMENT.'_'.$queueNamePrefix]
-            );
+            $result = $this->_get_client('Sqs')->listQueues($params);
 
             return $result->get('QueueUrls');
         } catch (SqsException $e) {
