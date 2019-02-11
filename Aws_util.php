@@ -269,7 +269,9 @@ class Aws_util {
                 '-r';
         }
 
-        $args[] = $use_awss3cli ? '' : '--cf-invalidate';
+        if (preg_match('~s3://(readmoo/production/images/banner_upload/|readmoo-campaign/|readmoo-cf-)~', $target)) {
+            $args[] = $use_awss3cli ? '' : '--cf-invalidate';
+        }
 
         $cmd = sprintf(
             empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
