@@ -256,16 +256,21 @@ class Aws_util {
                 '--quiet' :
                 '-q';
         }
+
         if ($no_mime_magic) {
             $args[] = $use_awss3cli ?
                 '' :
                 '--no-mime-magic';
         }
+
         if ($recursive && ( ! $use_awss3cli OR $mode != 'sync')) {
             $args[] = $use_awss3cli ?
                 '--recursive' :
                 '-r';
         }
+
+        $args[] = $use_awss3cli ? '' : '--cf-invalidate';
+
         $cmd = sprintf(
             empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
             $use_awss3cli ? $this->_config['eb_aws_s3'] : $this->_config['cmd_s3cmd'],
@@ -274,6 +279,7 @@ class Aws_util {
             $source,
             $target
         );
+
         if ($dry_run) {
             return $cmd;
         }
