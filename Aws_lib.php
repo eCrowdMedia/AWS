@@ -190,6 +190,23 @@ class Aws_lib
     }
 
     /**
+     * @method Model getObject(array $args = [])
+     */
+    public function getObject($bucket_name, $key, array $options = [])
+    {
+        try {
+            $options = [
+                'Bucket' => $bucket_name,
+                'Key' => $key,
+            ] + $options;
+
+            return $this->_get_client('S3')->getObject($options);
+        } catch (S3Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    /**
      * @method Model putObject(array $args = array()) {@command S3 PutObject}
      */
     public function putObject($bucket_name, $key, $source, array $options = [])
