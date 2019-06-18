@@ -293,7 +293,7 @@ class Aws_util {
         }
     }
 
-    public function s3_del($s3_key)
+    public function s3_del($s3_key, $dry_run = false)
     {
         if (empty($s3_key) OR strpos($s3_key, self::$_s3_protocol) !== 0) {
             return false;
@@ -304,7 +304,8 @@ class Aws_util {
         $cmd = isset($this->_config['eb_aws_s3']) ?
             ($this->_config['eb_aws_s3'] . ' rm --recursive ') :
             ($this->_config['cmd_s3cmd'] . ' del -r ');
-        return $this->_CI->process_lib->execute($cmd . $s3_key);
+        $cmd .= $s3_key;
+        return $dry_run ? $cmd : $this->_CI->process_lib->execute($cmd);
     }
 
     private function _s3_key_ebook(array &$segments, array $params)
