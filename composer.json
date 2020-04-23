@@ -21,6 +21,6 @@
 		"composer/installers": "^1.2",
 		"aws/aws-sdk-php":"^3.0.0",
 		"ps/image-optimizer": "^1.0.6",
-		"ecrowdmedia/common": "^1.34.0"
+		"ecrowdmedia/common": "dev-master"
 	}
 }
