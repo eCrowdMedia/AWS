@@ -29,13 +29,14 @@
     }
 }
 */
-class Aws_util {
+class Aws_util
+{
     private static $_s3_protocol = 's3://';
     private static $_priv_key = null;
     private $_CI = false;
     private $_config = false;
 
-    function __construct($config = array())
+    public function __construct($config = array())
     {
         $this->_CI =& get_instance();
         $this->_config = array_merge(
@@ -47,7 +48,7 @@ class Aws_util {
         );
     }
 
-    function __destruct()
+    public function __destruct()
     {
         empty(self::$_priv_key) or openssl_free_key(self::$_priv_key);
     }
@@ -56,14 +57,11 @@ class Aws_util {
     {
         if (is_string($task)) {
             $this->add_cmd($task);
-        }
-        elseif (isset($task['cmd'])) {
+        } elseif (isset($task['cmd'])) {
             $this->add_cmd($task['cmd']);
-        }
-        elseif (isset($task['cli'])) {
+        } elseif (isset($task['cli'])) {
             $this->add_cli($task['cli']);
-        }
-        elseif (is_array($task)) {
+        } elseif (is_array($task)) {
             foreach ($task as $key => $value) {
                 is_numeric($key) && $this->add_task($value);
             }
@@ -77,8 +75,7 @@ class Aws_util {
             $this->_tasks[] = [
                 'cmd' => $cmd
             ];
-        }
-        elseif (is_array($cmd)) {
+        } elseif (is_array($cmd)) {
             foreach ($cmd as $key => $value) {
                 if (is_numeric($key) && is_string($value)) {
                     $this->_tasks[] = [
@@ -106,19 +103,17 @@ class Aws_util {
         $command = $this->_config['eb_cli'];
         if (is_string($cli)) {
             $command .= ' ' . $cli;
-        }
-        elseif (isset($cli['class'])) {
-            if ( ! empty($cli['path'])) {
+        } elseif (isset($cli['class'])) {
+            if (! empty($cli['path'])) {
                 $command .= ' ' . implode(' ', (array)$cli['path']);
             }
             $command .= ' ' . $cli['class'];
-            $command .= ' ' . ((empty($cli['method']) OR ! is_string($cli['method'])) ? 'index' : $cli['method']);
+            $command .= ' ' . ((empty($cli['method']) or ! is_string($cli['method'])) ? 'index' : $cli['method']);
             if (isset($cli['parameters'])) {
                 $command .= ' ' . (is_array($cli['parameters']) ? implode(' ', $cli['parameters']) : $cli['parameters']);
             }
-        }
-        else {
-            return FALSE;
+        } else {
+            return false;
         }
         return $command;
     }
@@ -132,14 +127,12 @@ class Aws_util {
         foreach ($this->_tasks as $task) {
             if (isset($task['cmd'])) {
                 $cmd = $task['cmd'];
-            }
-            elseif (isset($task['cli'])) {
+            } elseif (isset($task['cli'])) {
                 $cmd = $this->_cli_to_cmd($task['cli']);
-            }
-            else {
+            } else {
                 unset($cmd);
             }
-            if ( ! empty($cmd)) {
+            if (! empty($cmd)) {
                 $cmds[] = $cmd;
             }
         }
@@ -181,13 +174,13 @@ class Aws_util {
                         $recursive = $value;
                         break;
 
-                    case 'reducedredundancy':
+                    /*case 'reducedredundancy':
                         if ($value) {
                             $args[] = $use_awss3cli ?
                                 '--storage-class REDUCED_REDUNDANCY' :
                                 '--rr';
                         }
-                        break;
+                        break;*/
 
                     case 'public':
                         if ($value) {
@@ -263,15 +256,15 @@ class Aws_util {
                 '--no-mime-magic';
         }
 
-        if ($recursive && ( ! $use_awss3cli OR $mode != 'sync')) {
+        if ($recursive && (! $use_awss3cli or $mode != 'sync')) {
             $args[] = $use_awss3cli ?
                 '--recursive' :
                 '-r';
         }
 
-        if (preg_match('~s3://(readmoo/production/images/banner_upload/|readmoo-campaign/|readmoo-cf-)~', $target)) {
+        /*if (preg_match('~s3://(readmoo/production/images/banner_upload/|readmoo-campaign/|readmoo-cf-)~', $target)) {
             $args[] = $use_awss3cli ? '' : '--cf-invalidate';
-        }
+        }*/
 
         $cmd = sprintf(
             empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
@@ -284,8 +277,7 @@ class Aws_util {
 
         if ($dry_run) {
             return $cmd;
-        }
-        else {
+        } else {
             $this->_CI->load->add_package_path(config_item('common_package'));
             $this->_CI->load->library('process_lib');
             $this->_CI->load->remove_package_path(config_item('common_package'));
@@ -295,7 +287,7 @@ class Aws_util {
 
     public function s3_del($s3_key, $dry_run = false)
     {
-        if (empty($s3_key) OR strpos($s3_key, self::$_s3_protocol) !== 0) {
+        if (empty($s3_key) or strpos($s3_key, self::$_s3_protocol) !== 0) {
             return false;
         }
         $this->_CI->load->add_package_path(config_item('common_package'));
@@ -312,7 +304,7 @@ class Aws_util {
     {
         if (isset($params['file'])) {
             $file = $params['file'];
-            if (empty($file['manifestation_id']) OR
+            if (empty($file['manifestation_id']) or
                 empty($file['sn'])
             ) {
                 throw new Exception('Invalid parameters, no manifestation_id');
@@ -320,7 +312,7 @@ class Aws_util {
             $segments[] = $file['manifestation_id'] % 1000;
             $segments[] = $file['manifestation_id'];
             $segments[] = $file['sn'];
-            if (empty($file['version']) OR
+            if (empty($file['version']) or
                 empty($file['setting'])
             ) {
                 return true;
@@ -347,7 +339,7 @@ class Aws_util {
     private function _s3_key_book(array &$segments, array $params)
     {
         $segments[] = empty($params['mode']) ? 'preview' : $params['mode'];
-        if ( ! empty($params['readmoo_id'])) {
+        if (! empty($params['readmoo_id'])) {
             $segments[] = $params['readmoo_id'];
         }
     }
@@ -360,14 +352,14 @@ class Aws_util {
         array_pop($segments);
         $segments[] = 'ebook';
         $file = $params['file'];
-        if (empty($file['manifestation_id']) OR
+        if (empty($file['manifestation_id']) or
             empty($file['sn'])) {
             throw new Exception('Invalid parameters, no manifestation_id');
         }
         $segments[] = $file['manifestation_id'] % 1000;
         $segments[] = $file['manifestation_id'];
         $segments[] = $file['sn'];
-        if (empty($file['version']) OR
+        if (empty($file['version']) or
             empty($file['setting'])) {
             throw new Exception('Invalid parameters, file is incomplete');
         }
@@ -380,20 +372,20 @@ class Aws_util {
 
     private function _s3_key_cover($mode, array &$segments, array $params)
     {
-        function_exists('id_encrypt') OR $this->_CI->load->helper('id_encrypt');
+        function_exists('id_encrypt') or $this->_CI->load->helper('id_encrypt');
         switch ($mode) {
             case 'cover':
-                if ( ! empty($params['manifestation']['sn'])) {
+                if (! empty($params['manifestation']['sn'])) {
                     $encoded_id = id_encode($params['manifestation']['sn']);
                 }
                 break;
             case 'social/cover':
-                if ( ! empty($params['work_id'])) {
+                if (! empty($params['work_id'])) {
                     $encoded_id = id_encode($params['work_id']);
                 }
                 break;
             case 'share/cover':
-                if ( ! empty($params['manifestation_id'])) {
+                if (! empty($params['manifestation_id'])) {
                     $encoded_id = id_encode($params['manifestation_id']);
                 }
                 break;
@@ -406,8 +398,7 @@ class Aws_util {
         if (isset($encoded_id) && strlen($encoded_id) > 2) {
             $segments[] = substr($encoded_id, 0, 2);
             $segments[] = substr($encoded_id, 2);
-        }
-        else {
+        } else {
             throw new Exception('Invalid parameters, no proper id found');
         }
     }
@@ -422,7 +413,7 @@ class Aws_util {
             'campaign',
             $params['name']
         ];
-        if ( ! empty($params['path'])) {
+        if (! empty($params['path'])) {
             $segments[] = $params['path'];
         }
     }
@@ -442,8 +433,7 @@ class Aws_util {
                     substr($params['md'], 8) . substr($params['sha'], -2),
                 ]
             );
-        }
-        elseif (isset($params['key'])) {
+        } elseif (isset($params['key'])) {
             $segments[] = $params['key'];
         }
     }
@@ -519,8 +509,8 @@ class Aws_util {
             default:
                 $this->_CI->load->helper('print');
                 foreach ($this->_config['s3_key'] as $key => $value) {
-                    if ($key == $mode OR preg_match(sprintf('!%s!', $key), $mode)) {
-                        (isset($value['validate']) && empty($value['validate'])) OR
+                    if ($key == $mode or preg_match(sprintf('!%s!', $key), $mode)) {
+                        (isset($value['validate']) && empty($value['validate'])) or
                         array_walk($params, function ($var) {
                             if (empty($var)) {
                                 throw new Exception('Invalid args.', 1);
@@ -532,7 +522,7 @@ class Aws_util {
                         }
 
                         $result = vnsprintf($value['format'], $params);
-                        if ( ! empty($result)) {
+                        if (! empty($result)) {
                             $segments[] = $result;
                         }
                         break 2;
@@ -568,7 +558,7 @@ class Aws_util {
 
     private function _presign_process(array &$params)
     {
-        if (empty($params['url']) OR
+        if (empty($params['url']) or
             ! preg_match('|^(http[s\*]?):\/\/([^\/]+)(\/.*)$|', $params['url'], $match)
         ) {
             throw new Exception('Invalid parameters, no url found.', 400);
@@ -713,10 +703,10 @@ class Aws_util {
             $args['IfNoneMatch'] = $_SERVER['HTTP_IF_NONE_MATCH'];
         }
         if (strpos($filename, self::$_s3_protocol) === 0) {
-            if ( ! preg_match('|^s3://([^/]+)/(.+)$|', $filename, $match)) {
+            if (! preg_match('|^s3://([^/]+)/(.+)$|', $filename, $match)) {
                 return header('HTTP/1.0 404 Not Found');
             }
-            class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+            class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
             $result = $this->_CI->aws_lib->headObject($match[1], $match[2], $args);
             if (empty($result)) {
                 return header('HTTP/1.0 404 Not Found');
@@ -725,8 +715,7 @@ class Aws_util {
             $args['LastModified'] = $result->get('LastModified') ? $result->get('LastModified')->format('D, d M Y H:i:s \G\M\T') : null;
             $args['ContentType'] = $result->get('ContentType');
             $args['ContentLength'] = $result->get('ContentLength');
-        }
-        else {
+        } else {
             $timestamp = filemtime($filename);
             $args['ETag'] = '"' . md5('traditional chinese' . $timestamp) . '"';
             $args['LastModified'] = gmdate('D, d M Y H:i:s \G\M\T', $timestamp);
@@ -757,7 +746,7 @@ class Aws_util {
 
     public function sms($phone, $message)
     {
-        class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
         return $this->_CI->aws_lib->publish([
             'PhoneNumber' => $phone,
             'Message' => $message,
@@ -766,7 +755,7 @@ class Aws_util {
 
     public function publish($topic, $message, $subject = null)
     {
-        class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
         return $this->_CI->aws_lib->publish([
             'TopicArn' => $this->_config['sns_topic_prefix'] . $topic,
             'Subject' => $subject,
@@ -776,7 +765,7 @@ class Aws_util {
 
     public function subscribe($endpoint, $protocol, $topic)
     {
-        class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
+        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
         return $this->_CI->aws_lib->subscribe(
             $endpoint,
             $protocol,
