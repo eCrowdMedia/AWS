@@ -81,11 +81,9 @@ class Aws_lib
             return false;
         }
         try {
-            $this->_get_client('S3')->createBucket(
-            [
+            $this->_get_client('S3')->createBucket([
                 'Bucket' => $bucket_name,
                 'ACL' => 'public-read',
-                //add more items if required here
             ]);
 
             return true;
@@ -149,8 +147,7 @@ class Aws_lib
     {
         if ($this->doesBucketExist($bucket_name)) {
             try {
-                $this->_get_client('S3')->putBucketPolicy(
-                [
+                $this->_get_client('S3')->putBucketPolicy([
                     'Bucket' => $bucket_name,
                     'Policy' => $this->_return_bucket_policy($bucket_name),
                 ]);
@@ -212,12 +209,6 @@ class Aws_lib
     public function putObject($bucket_name, $key, $source, array $options = [])
     {
         try {
-            if (empty($options['ACL'])) {
-                $options['ACL'] = strpos($bucket_name, 'readmoo-cf-') === 0 ? 'public-read' : 'private';
-            }
-            if (empty($options['StorageClass'])) {
-                $options['StorageClass'] = strpos($bucket_name, 'readmoo-cf-') === 0 ? 'REDUCED_REDUNDANCY' : 'STANDARD';
-            }
             $options = [
                 'Bucket' => $bucket_name,
                 'Key' => $key,
@@ -242,12 +233,6 @@ class Aws_lib
     public function copyObject($bucket_name, $key, $source, array $options = [])
     {
         try {
-            if (empty($options['ACL'])) {
-                $options['ACL'] = strpos($bucket_name, 'readmoo-cf-') === 0 ? 'public-read' : 'private';
-            }
-            if (empty($options['StorageClass'])) {
-                $options['StorageClass'] = strpos($bucket_name, 'readmoo-cf-') === 0 ? 'REDUCED_REDUNDANCY' : 'STANDARD';
-            }
             $options = [
                 'Bucket' => $bucket_name,
                 'Key' => $key,
@@ -821,53 +806,58 @@ class Aws_lib
      * The following methods is used to interact with the **AWS Batch** service.
      */
 
-    public function describe_job_queues(array $jobQueues =[]){
-        if(empty($jobQueues)){
+    public function describe_job_queues(array $jobQueues =[])
+    {
+        if (empty($jobQueues)) {
             return false;
         }
-        try{
+        try {
             $result = $this->_get_client('Batch')->describeJobQueues([
                 'jobQueues' => $jobQueues,
                ]);
         } catch (BatchException $e) {
-             $result['error_msg'] = $e->getMessage();
-        }
-        return $result;
-    }
-
-    public function register_job_definition(array $job_definition){
-        try {
-            $result =  $this->_get_client('Batch')->registerJobDefinition($job_definition);
-        }catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
         }
         return $result;
     }
 
-    public function deregister_job_definition($job_definition){
-        if(empty($job_definition)){
+    public function register_job_definition(array $job_definition)
+    {
+        try {
+            $result =  $this->_get_client('Batch')->registerJobDefinition($job_definition);
+        } catch (BatchException $e) {
+            $result['error_msg'] = $e->getMessage();
+        }
+        return $result;
+    }
+
+    public function deregister_job_definition($job_definition)
+    {
+        if (empty($job_definition)) {
             return false;
         }
         try {
             $result = $this->_get_client('Batch')->deregisterJobDefinition([
                     'jobDefinition' => $job_definition
                 ]);
-        }catch (BatchException $e) {
+        } catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
         }
         return $result;
     }
 
-    public function submit_job(array $job_definition){
+    public function submit_job(array $job_definition)
+    {
         try {
             $result = $this->_get_client('Batch')->submitJob($job_definition);
-        }catch (BatchException $e) {
+        } catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
         }
         return $result;
     }
 
-    public function cancel_job($jobId, $reason){
+    public function cancel_job($jobId, $reason)
+    {
         if (empty($jobId) || empty($reason)) {
             return false;
         }
@@ -879,11 +869,13 @@ class Aws_lib
         } catch (BatchException $e) {
             $result['error_msg'] = $e->getMessage();
         }
-        return $result;;
+        return $result;
+        ;
     }
 
-    public function terminate_job($jobId, $reason){
-        if(empty($jobId) || empty($reason)){
+    public function terminate_job($jobId, $reason)
+    {
+        if (empty($jobId) || empty($reason)) {
             return false;
         }
 
@@ -898,23 +890,24 @@ class Aws_lib
         return $result;
     }
 
-    public function list_jobs($jobQueue, $jobStatus = 'RUNNING', $maxResults = 100, $nextToken = null){
-            $status = ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING','RUNNING', 'SUCCEEDED', 'FAILED'];
+    public function list_jobs($jobQueue, $jobStatus = 'RUNNING', $maxResults = 100, $nextToken = null)
+    {
+        $status = ['SUBMITTED', 'PENDING', 'RUNNABLE', 'STARTING','RUNNING', 'SUCCEEDED', 'FAILED'];
 
-            if(empty($jobQueue) || !in_array($jobStatus, $status)){
-                return false;
-            }
-            try {
-                $result = $this->_get_client('Batch')->listJobs([
-                    'jobQueue' => $jobQueue, // REQUIRED
-                    'jobStatus' => $jobStatus,
-                    'maxResults' => $maxResults,
-                    'nextToken' => $nextToken,
-                ]);
-            } catch (Exception $e) {
-                $result['error_msg'] = $e->getMessage();
-            }
-            return $result;
+        if (empty($jobQueue) || !in_array($jobStatus, $status)) {
+            return false;
+        }
+        try {
+            $result = $this->_get_client('Batch')->listJobs([
+                'jobQueue' => $jobQueue, // REQUIRED
+                'jobStatus' => $jobStatus,
+                'maxResults' => $maxResults,
+                'nextToken' => $nextToken,
+            ]);
+        } catch (Exception $e) {
+            $result['error_msg'] = $e->getMessage();
+        }
+        return $result;
     }
 
     //$ids : A space-separated list of up to 100 job IDs.
@@ -935,12 +928,11 @@ class Aws_lib
                 $result['error_msg'][] = $e->getMessage();
             }
 
-            if(!empty($res)){
+            if (!empty($res)) {
                 $result = array_merge($result, $res['jobs']);
             }
         }
-       return $result;
-
+        return $result;
     }
 
     /*
@@ -1038,9 +1030,7 @@ class Aws_lib
     public function unsubscribe($subscription_arn)
     {
         try {
-
         } catch (Exception $e) {
-
         }
     }
 
