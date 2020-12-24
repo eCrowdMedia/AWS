@@ -8,27 +8,7 @@
  * @author      Willy
  * @link        https://readmoo.com
  */
-/*
-{
-    "input": [
-        {
-            "path: "task",
-            "class": "import",
-            "method": "explore",
-            "parameters": [$json['key']]
-        },
-        {
-            cli: ""
-        },
-        {
-            cmd: ""
-        }
-    ],
-    "output": {
-        cli / cmd
-    }
-}
-*/
+
 class Aws_util
 {
     private static $_s3_protocol = 's3://';
@@ -261,10 +241,6 @@ class Aws_util
                 '--recursive' :
                 '-r';
         }
-
-        /*if (preg_match('~s3://(readmoo/production/images/banner_upload/|readmoo-campaign/|readmoo-cf-)~', $target)) {
-            $args[] = $use_awss3cli ? '' : '--cf-invalidate';
-        }*/
 
         $cmd = sprintf(
             empty($use_quote) ? '%s %s %s %s %s' : '%s %s %s "%s" "%s"',
