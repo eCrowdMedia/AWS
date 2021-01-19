@@ -17,6 +17,9 @@ use Aws\DynamoDb\DynamoDbClient;
 use Aws\Batch\Exception\BatchException;
 use Aws\Batch\BatchClient;
 
+use GuzzleHttp\Client;
+use GuzzleHttp\Exception\RequestException;
+
 class Aws_lib
 {
     private $_CI = null;
@@ -41,14 +44,6 @@ class Aws_lib
             $this->_config = $this->_CI->config->item('aws_config', 'aws');
         }
         $this->_sdk = new Aws\Sdk($this->_config);
-    }
-
-    private function _get_client($name)
-    {
-        if (!isset($this->_client_pool[$name])) {
-            $this->_client_pool[$name] = $this->_sdk->{'create' . $name}();
-        }
-        return $this->_client_pool[$name];
     }
 
     public function isBucketDnsCompatible($bucket_name)
@@ -119,25 +114,6 @@ class Aws_lib
         } catch (S3Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
-    }
-
-    private function _return_bucket_policy($bucket_name = '')
-    {
-        return '{
-            "Version": "2008-10-17",
-            "Id": "PolicyForCloudFrontPrivateContent",
-            "Statement": [
-                {
-                    "Sid": "1",
-                    "Effect": "Allow",
-                    "Principal": {
-                        "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity '.$this->_cfIdentity.'"
-                    },
-                    "Action": "s3:GetObject",
-                    "Resource": "arn:aws:s3:::'.$bucket_name.'/*"
-                }
-            ]
-        }';
     }
 
     /**
@@ -356,55 +332,6 @@ class Aws_lib
         } catch (CloudFrontException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
-    }
-
-    private function _return_distribution_config_array($bucket_name = '', $domain_name = '', $enabled = true)
-    {
-        $origin_id = 'S3-'.$bucket_name;
-
-        return [
-            'DistributionConfig' => [
-                'CallerReference' => md5(time()),
-                'Aliases' => [
-                    'Quantity' => 1,
-                    'Items' => [$domain_name],
-                ],
-                'DefaultRootObject' => 'index.html',
-                'Origins' => [
-                    'Quantity' => 1,
-                    'Items' => [
-                        [
-                            'Id' => $origin_id,
-                            'DomainName' => strtolower($bucket_name.'.s3.amazonaws.com'),
-                            'S3OriginConfig' => [
-                                'OriginAccessIdentity' => 'origin-access-identity/cloudfront/'.$this->_cfIdentity,
-                            ],
-                        ],
-                    ],
-                ],
-                'DefaultCacheBehavior' => [
-                    'TargetOriginId' => $origin_id,
-                    'ForwardedValues' => [
-                        'QueryString' => false,
-                    ],
-                    'TrustedSigners' => [
-                        'Enabled' => false,
-                        'Quantity' => 0,
-                        'Items' => [],
-                ],
-                    'ViewerProtocolPolicy' => ViewerProtocolPolicy::ALLOW_ALL,
-                    'MinTTL' => 0,
-                ],
-                'CacheBehaviors' => ['Quantity' => 0, 'Items' => []],
-                'Comment' => 'Distribution for '.$bucket_name,
-                'Logging' => [
-                    'Enabled' => false,
-                    'Bucket' => '',
-                    'Prefix' => '',
-                ],
-                'Enabled' => $enabled,
-            ],
-        ];
     }
 
     public function disableDistribution($cfID)
@@ -973,41 +900,6 @@ class Aws_lib
         }
     }
 
-    private function _valid_json($json)
-    {
-        if (is_string($json)) {
-            $json = @json_decode($json, true);
-            return json_last_error() === JSON_ERROR_NONE &&
-                isset($json['default']);
-        }
-    }
-
-    private function _valid_E164($phone)
-    {
-        return preg_match('/^\+?[1-9]\d{1,14}$/', $phone);
-    }
-
-    private function _valid_subject($subject)
-    {
-        return true;
-        return preg_match('/^[\w:punct:][^\v]{0,99}$/', $subject);
-    }
-
-    private function _valid_arn(array $params)
-    {
-        $count = 0;
-        if (isset($params['PhoneNumber'])) {
-            ++$count;
-        }
-        if (isset($params['TargetArn'])) {
-            ++$count;
-        }
-        if (isset($params['TopicArn'])) {
-            ++$count;
-        }
-        return $count === 1;
-    }
-
     public function subscribe($endpoint, $protocol, $topic_arn)
     {
         try {
@@ -1030,6 +922,35 @@ class Aws_lib
     public function unsubscribe($subscription_arn)
     {
         try {
+        } catch (Exception $e) {
+        }
+    }
+
+    public function get_ip_ranges($service)
+    {
+        try {
+            switch ($service) {
+                case 'CLOUDFRONT':
+                    $endpoint = 'http://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips';
+                    break;
+                default:
+                    throw new Exception('Unsupport AWS service: ' . $service, 400);
+                    break;
+            }
+            $client = new GuzzleHttp\Client();
+            $response = $client->request('GET', $endpoint);
+            $status_code = $response->getStatusCode();
+            if ($status_code !== 200) {
+                throw new Exception('Failed to get ip ranges of AWS ' . $service, 400);
+            }
+
+            $response_content = $response->getBody()->getContents();
+            $response_json = json_decode($response_content, true);
+            return array_merge(
+                $response_json['CLOUDFRONT_GLOBAL_IP_LIST'],
+                $response_json['CLOUDFRONT_REGIONAL_EDGE_IP_LIST']
+            );
+        } catch (RequestException $e) {
         } catch (Exception $e) {
         }
     }
@@ -1070,6 +991,117 @@ class Aws_lib
                 throw new Exception('valid protocol: ' . $protocol, 500);
                 break;
         }
+    }
+
+    private function _get_client($name)
+    {
+        if (!isset($this->_client_pool[$name])) {
+            $this->_client_pool[$name] = $this->_sdk->{'create' . $name}();
+        }
+        return $this->_client_pool[$name];
+    }
+
+    private function _return_bucket_policy($bucket_name = '')
+    {
+        return '{
+            "Version": "2008-10-17",
+            "Id": "PolicyForCloudFrontPrivateContent",
+            "Statement": [
+                {
+                    "Sid": "1",
+                    "Effect": "Allow",
+                    "Principal": {
+                        "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity '.$this->_cfIdentity.'"
+                    },
+                    "Action": "s3:GetObject",
+                    "Resource": "arn:aws:s3:::'.$bucket_name.'/*"
+                }
+            ]
+        }';
+    }
+
+    private function _return_distribution_config_array($bucket_name = '', $domain_name = '', $enabled = true)
+    {
+        $origin_id = 'S3-'.$bucket_name;
+
+        return [
+            'DistributionConfig' => [
+                'CallerReference' => md5(time()),
+                'Aliases' => [
+                    'Quantity' => 1,
+                    'Items' => [$domain_name],
+                ],
+                'DefaultRootObject' => 'index.html',
+                'Origins' => [
+                    'Quantity' => 1,
+                    'Items' => [
+                        [
+                            'Id' => $origin_id,
+                            'DomainName' => strtolower($bucket_name.'.s3.amazonaws.com'),
+                            'S3OriginConfig' => [
+                                'OriginAccessIdentity' => 'origin-access-identity/cloudfront/'.$this->_cfIdentity,
+                            ],
+                        ],
+                    ],
+                ],
+                'DefaultCacheBehavior' => [
+                    'TargetOriginId' => $origin_id,
+                    'ForwardedValues' => [
+                        'QueryString' => false,
+                    ],
+                    'TrustedSigners' => [
+                        'Enabled' => false,
+                        'Quantity' => 0,
+                        'Items' => [],
+                ],
+                    'ViewerProtocolPolicy' => ViewerProtocolPolicy::ALLOW_ALL,
+                    'MinTTL' => 0,
+                ],
+                'CacheBehaviors' => ['Quantity' => 0, 'Items' => []],
+                'Comment' => 'Distribution for '.$bucket_name,
+                'Logging' => [
+                    'Enabled' => false,
+                    'Bucket' => '',
+                    'Prefix' => '',
+                ],
+                'Enabled' => $enabled,
+            ],
+        ];
+    }
+
+    private function _valid_json($json)
+    {
+        if (is_string($json)) {
+            $json = @json_decode($json, true);
+            return json_last_error() === JSON_ERROR_NONE &&
+                isset($json['default']);
+        }
+    }
+
+    private function _valid_E164($phone)
+    {
+        return preg_match('/^\+?[1-9]\d{1,14}$/', $phone);
+    }
+
+    private function _valid_subject($subject)
+    {
+        return true;
+        return preg_match('/^[\w:punct:][^\v]{0,99}$/', $subject);
+    }
+
+    private function _valid_arn(array $params)
+    {
+        $count = 0;
+        if (isset($params['PhoneNumber'])) {
+            ++$count;
+        }
+        if (isset($params['TargetArn'])) {
+            ++$count;
+        }
+        if (isset($params['TopicArn'])) {
+            ++$count;
+        }
+        return $count === 1;
     }
 }
 // END Aws_lib Class
