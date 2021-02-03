@@ -320,7 +320,7 @@ class Aws_util
         }
     }
 
-    private function _s3_key_file($mode, array &$segments, array $params)
+    private function _s3_key_ebook_file($mode, array &$segments, array $params)
     {
         if (empty($params['file'])) {
             throw new Exception('Invalid parameters, no file found');
@@ -446,6 +446,26 @@ class Aws_util
         }
     }
 
+    private function _s3_key_media_file(array &$segments, array $params)
+    {
+        $segments = [
+            self::$_s3_protocol . 'file' . $_SERVER['DOMAIN'],
+            'f',
+        ];
+        if (isset($params['md5'], $params['sha256'])) {
+            $segments = array_merge(
+                $segments,
+                [
+                    substr($params['md5'], 0, 4),
+                    substr($params['md5'], 4, 4),
+                    substr($params['md5'], 8) . substr($params['sha256'], -2),
+                ]
+            );
+        } elseif (isset($params['key'])) {
+            $segments[] = $params['key'];
+        }
+    }
+
     public function s3_key(array $params, $mode = 'ebook', $use_cf = false, $trailing_slash = true)
     {
         $segments = [
@@ -462,6 +482,7 @@ class Aws_util
             case 'campaign':
             case 'doc':
             case 'api':
+            case 'media_file':
                 $function = '_s3_key_' . $mode;
                 $this->{$function}($segments, $params);
                 break;
@@ -469,7 +490,7 @@ class Aws_util
             case 'full':
             case 'preview':
             case 'manual':
-                $this->_s3_key_file($mode, $segments, $params);
+                $this->_s3_key_ebook_file($mode, $segments, $params);
                 break;
 
             case 'cover':
