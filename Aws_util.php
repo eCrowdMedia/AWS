@@ -372,8 +372,7 @@ class Aws_util
             $encoded_id = $params['encoded_id'];
         }
         if (isset($encoded_id) && strlen($encoded_id) > 2) {
-            $segments[] = substr($encoded_id, 0, 2);
-            $segments[] = substr($encoded_id, 2);
+            $segments[] = substr_replace($encoded_id, '/', 2, 0);
         } else {
             throw new Exception('Invalid parameters, no proper id found');
         }
@@ -404,9 +403,7 @@ class Aws_util
             $segments = array_merge(
                 $segments,
                 [
-                    substr($params['md'], 0, 4),
-                    substr($params['md'], 4, 4),
-                    substr($params['md'], 8) . substr($params['sha'], -2),
+                    substr_replace(substr_replace($params['md'], '/', 8, 0), '/', 4, 0) . substr($params['sha'], -2),
                 ]
             );
         } elseif (isset($params['key'])) {
@@ -438,9 +435,7 @@ class Aws_util
             $segments = array_merge(
                 $segments,
                 [
-                    substr($params['content-id'], 0, 4),
-                    substr($params['content-id'], 4, 4),
-                    substr($params['content-id'], 8) . '.epub',
+                    substr_replace(substr_replace($params['content-id'], '/', 8, 0), '/', 4, 0) . '.epub',
                 ]
             );
         }
@@ -456,9 +451,7 @@ class Aws_util
             $segments = array_merge(
                 $segments,
                 [
-                    substr($params['md5'], 0, 4),
-                    substr($params['md5'], 4, 4),
-                    substr($params['md5'], 8) . substr($params['sha256'], -2),
+                    substr_replace(substr_replace($params['md5'], '/', 8, 0), '/', 4, 0) . substr($params['sha256'], -2),
                 ]
             );
         } elseif (isset($params['key'])) {
