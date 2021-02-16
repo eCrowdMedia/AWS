@@ -400,12 +400,7 @@ class Aws_util
             'd',
         ];
         if (isset($params['md'], $params['sha'])) {
-            $segments = array_merge(
-                $segments,
-                [
-                    substr_replace(substr_replace($params['md'], '/', 8, 0), '/', 4, 0) . substr($params['sha'], -2),
-                ]
-            );
+            $segments[] = substr_replace(substr_replace($params['md'], '/', 8, 0), '/', 4, 0) . substr($params['sha'], -2);
         } elseif (isset($params['key'])) {
             $segments[] = $params['key'];
         }
@@ -432,12 +427,7 @@ class Aws_util
             $mode[0],
         ];
         if (!empty($params['content-id'])) {
-            $segments = array_merge(
-                $segments,
-                [
-                    substr_replace(substr_replace($params['content-id'], '/', 8, 0), '/', 4, 0) . '.epub',
-                ]
-            );
+            $segments[] = substr_replace(substr_replace($params['content-id'], '/', 8, 0), '/', 4, 0) . '.epub';
         }
     }
 
@@ -445,15 +435,10 @@ class Aws_util
     {
         $segments = [
             self::$_s3_protocol . 'file' . $_SERVER['DOMAIN'],
-            'f',
+            $params['prefix'][0] ?? 'f',
         ];
         if (isset($params['md5'], $params['sha256'])) {
-            $segments = array_merge(
-                $segments,
-                [
-                    substr_replace(substr_replace($params['md5'], '/', 8, 0), '/', 4, 0) . substr($params['sha256'], -2),
-                ]
-            );
+            $segments[] = substr_replace(substr_replace($params['md5'], '/', 8, 0), '/', 4, 0) . substr($params['sha256'], -2);
         } elseif (isset($params['key'])) {
             $segments[] = $params['key'];
         }
