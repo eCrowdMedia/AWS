@@ -647,6 +647,9 @@ class Aws_util
     private function _sign($data)
     {
         if (empty(self::$_priv_key)) {
+            if (!is_readable($this->get_config('cf_pk_pathname'))) {
+                return null;
+            }
             self::$_priv_key = openssl_get_privatekey('file://' . $this->get_config('cf_pk_pathname'));
         }
         $signature = null;
