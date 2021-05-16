@@ -28,11 +28,6 @@ class Aws_util
         );
     }
 
-    public function __destruct()
-    {
-        empty(self::$_priv_key) or openssl_free_key(self::$_priv_key);
-    }
-
     public function add_task($task)
     {
         if (is_string($task)) {
