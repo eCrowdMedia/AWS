@@ -159,9 +159,7 @@ class Aws_util
 
                     case 'public':
                         if ($value) {
-                            $args[] = $use_awss3cli ?
-                                '--acl public-read' :
-                                '-P';
+                            $args[] = $use_awss3cli ? '--acl public-read' : '-P';
                         }
                         break;
 
@@ -173,9 +171,7 @@ class Aws_util
 
                     case 'delete':
                         if ($value) {
-                            $args[] = $use_awss3cli ?
-                                '--delete' :
-                                '--delete-removed';
+                            $args[] = $use_awss3cli ? '--delete' : '--delete-removed';
                         }
                         break;
 
@@ -197,9 +193,7 @@ class Aws_util
 
                     case 'cache':
                         if ($value) {
-                            $args[] = ($use_awss3cli ?
-                                '--cache-control ' :
-                                '--add-header=Cache-control:') . $value;
+                            $args[] = ($use_awss3cli ? '--cache-control ' : '--add-header=Cache-control:') . $value;
                         }
                         break;
 
@@ -226,15 +220,22 @@ class Aws_util
         }
 
         if ($no_mime_magic) {
-            $args[] = $use_awss3cli ?
-                '' :
-                '--no-mime-magic';
+            $args[] = $use_awss3cli ? '' : '--no-mime-magic';
         }
 
         if ($recursive && (! $use_awss3cli or $mode != 'sync')) {
-            $args[] = $use_awss3cli ?
-                '--recursive' :
-                '-r';
+            $args[] = $use_awss3cli ? '--recursive' : '-r';
+        }
+
+        if ($use_awss3cli &&
+            $mode == 'sync' &&
+            preg_match('@(^.+\/)([^\/]+\*$)@', $source, $match)
+        ) {
+            $source = $match[1];
+            $args[] = sprintf(
+                '--exclude "*" --include "%s"',
+                $match[2]
+            );
         }
 
         $cmd = sprintf(
