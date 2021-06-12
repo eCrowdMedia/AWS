@@ -440,6 +440,24 @@ class Aws_util
         }
     }
 
+    private function _s3_key_user_reading_file(array &$segments, array $params)
+    {
+        function_exists('id_encrypt') or $this->_CI->load->helper('id_encrypt');
+        $segments = [
+            self::$_s3_protocol . 'file' . $_SERVER['DOMAIN'],
+            $params['prefix'][0] ?? 'u',
+            $encoded_user_id = id_encrypt($params['user_id']),
+        ];
+        foreach (['readding_id', 'file_id'] as $key) {
+            $binary = pack('P', intval($params[$key]));
+            $segments[] = str_replace(
+                ['+', '/'],
+                ['-', '_'],
+                rtrim(base64_encode($binary), '=')
+            );
+        }
+    }
+
     public function s3_key(array $params, $mode = 'ebook', $use_cf = false, $trailing_slash = true)
     {
         $segments = [
@@ -457,6 +475,7 @@ class Aws_util
             case 'doc':
             case 'api':
             case 'media_file':
+            case 'user_reading_file':
                 $function = '_s3_key_' . $mode;
                 $this->{$function}($segments, $params);
                 break;
