@@ -446,9 +446,9 @@ class Aws_util
         $segments = [
             self::$_s3_protocol . 'file' . $_SERVER['DOMAIN'],
             $params['prefix'][0] ?? 'u',
-            $encoded_user_id = id_encrypt($params['user_id']),
+            $encoded_user_id = id_encode($params['user_id']),
         ];
-        foreach (['readding_id', 'file_id'] as $key) {
+        foreach (['reading_id', 'file_id'] as $key) {
             $binary = pack('P', intval($params[$key]));
             $segments[] = str_replace(
                 ['+', '/'],
