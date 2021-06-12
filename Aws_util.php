@@ -449,7 +449,17 @@ class Aws_util
             $encoded_user_id = id_encode($params['user_id']),
         ];
         foreach (['reading_id', 'file_id'] as $key) {
-            $binary = pack('P', intval($params[$key]));
+            $value = intval($params[$key]);
+            if ($value >> 32) {
+                $format = 'Q';
+            } elseif ($value >> 16) {
+                $format = 'L';
+            } elseif ($value >> 8) {
+                $format = 'S';
+            } else {
+                $format = 'C';
+            }
+            $binary = pack($format, $value);
             $segments[] = str_replace(
                 ['+', '/'],
                 ['-', '_'],
