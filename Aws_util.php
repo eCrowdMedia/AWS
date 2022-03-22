@@ -440,6 +440,19 @@ class Aws_util
         }
     }
 
+    private function _s3_key_feedback(array &$segments, array $params)
+    {
+        $segments = [
+            self::$_s3_protocol . 'feedback' . $_SERVER['DOMAIN'],
+            $params['prefix'][0] ?? 'f',
+        ];
+        if (isset($params['md5'], $params['sha256'])) {
+            $segments[] = substr_replace(substr_replace($params['md5'], '/', 8, 0), '/', 4, 0) . substr($params['sha256'], -2);
+        } elseif (isset($params['key'])) {
+            $segments[] = $params['key'];
+        }
+    }
+
     private function _s3_key_user_reading_file(array &$segments, array $params)
     {
         function_exists('id_encrypt') or $this->_CI->load->helper('id_encrypt');
@@ -486,6 +499,7 @@ class Aws_util
             case 'api':
             case 'media_file':
             case 'user_reading_file':
+            case 'feedback':
                 $function = '_s3_key_' . $mode;
                 $this->{$function}($segments, $params);
                 break;
