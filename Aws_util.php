@@ -745,14 +745,14 @@ class Aws_util
             return header('HTTP/1.1 304 Not Modified');
         }
 
-        $this->_CI->load->helper('mime');
+        $this->_CI->load->helper('file');
 
         ob_start();
         header('Cache-Control: private, max-age=31536000, pre-check=31536000');
         header('Last-Modified: ' . $args['LastModified']);
         header('ETag: ' . $args['ETag']);
         header('Pragma: public');
-        header('Content-Type: ' . ext_mime_type($filename, $args['ContentType']));
+        header('Content-Type: ' . get_mime_by_extension($filename, $args['ContentType']));
         header('Content-Length: ' . $args['ContentLength']);
         ob_clean();
         ob_end_flush();
