@@ -24,13 +24,8 @@ class Aws_lib
 {
     private $_CI = null;
     private $_sdk = null;
-    private $_s3Client = null;
-    private $_cfClient = null;
-    private $_sqsClient = null;
     private $_cfIdentity = null;
-    private $_dynamoDbClient = null;
     private $_config = null;
-    private $_batchClient = null;
     private $_client_pool = [];
 
     public function __construct($config = [])
