@@ -698,7 +698,7 @@ class Aws_lib
         $result = [
             'items' => [],
             'count' => 0,
-            ];
+        ];
         try {
             do {
                 $response = $this->get_client('DynamoDb')->scan($params);
