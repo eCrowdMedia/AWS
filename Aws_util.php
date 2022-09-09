@@ -73,26 +73,6 @@ class Aws_util
         return $this;
     }
 
-    private function _cli_to_cmd($cli)
-    {
-        $command = $this->_config['eb_cli'];
-        if (is_string($cli)) {
-            $command .= ' ' . $cli;
-        } elseif (isset($cli['class'])) {
-            if (! empty($cli['path'])) {
-                $command .= ' ' . implode(' ', (array)$cli['path']);
-            }
-            $command .= ' ' . $cli['class'];
-            $command .= ' ' . ((empty($cli['method']) or ! is_string($cli['method'])) ? 'index' : $cli['method']);
-            if (isset($cli['parameters'])) {
-                $command .= ' ' . (is_array($cli['parameters']) ? implode(' ', $cli['parameters']) : $cli['parameters']);
-            }
-        } else {
-            return false;
-        }
-        return $command;
-    }
-
     public function get_combined_cmd($tasks = array())
     {
         foreach ($tasks as $mode => $task) {
@@ -270,6 +250,364 @@ class Aws_util
             ($this->_config['cmd_s3cmd'] . ' del -r ');
         $cmd .= $s3_key;
         return $dry_run ? $cmd : $this->_CI->process_lib->execute($cmd);
+    }
+
+    public function s3_key(array $params, $mode = 'ebook', $use_cf = false, $trailing_slash = true)
+    {
+        $segments = [
+            self::$_s3_protocol . (
+                $use_cf ?
+                    $this->_config['cf_bucket'] :
+                    $this->_config['s3_bucket']
+            ),
+            $mode
+        ];
+        switch ($mode) {
+            case 'ebook':
+            case 'book':
+            case 'campaign':
+            case 'doc':
+            case 'api':
+            case 'media_file':
+            case 'user_reading_file':
+            case 'feedback':
+                $function = '_s3_key_' . $mode;
+                $this->{$function}($segments, $params);
+                break;
+
+            case 'full':
+            case 'preview':
+            case 'manual':
+                $this->_s3_key_ebook_file($mode, $segments, $params);
+                break;
+
+            case 'cover':
+            case 'social/cover':
+            case 'share/cover':
+                $this->_s3_key_cover($mode, $segments, $params);
+                break;
+
+            case 'lcp':
+                $this->_s3_key_epub($mode, $segments, $params);
+                break;
+
+            default:
+                $this->_CI->load->helper('print');
+                foreach ($this->_config['s3_key'] as $key => $value) {
+                    if ($key == $mode or preg_match(sprintf('!%s!', $key), $mode)) {
+                        (isset($value['validate']) && empty($value['validate'])) or
+                        array_walk($params, function ($var) {
+                            if (empty($var)) {
+                                throw new Exception('Invalid args.', 1);
+                            }
+                        });
+
+                        if (isset($value['trailing_slash'])) {
+                            $trailing_slash = $value['trailing_slash'];
+                        }
+
+                        $result = vnsprintf($value['format'], $params);
+                        if (! empty($result)) {
+                            $segments[] = $result;
+                        }
+                        break 2;
+                    }
+                }
+                return null;
+        }
+        if ($trailing_slash) {
+            $segments[] = '';
+        }
+        return implode('/', $segments);
+    }
+
+    public function get_config($key)
+    {
+        return $this->_config[$key];
+    }
+
+    public function set_config($key, $value)
+    {
+        $this->_config[$key] = $value;
+    }
+
+    public function get_signed_url(array $params)
+    {
+        $url = $params['url'] . '?';
+        $params['url'] = str_replace('http://', 'http*://', $params['url']);
+        list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
+        $signature = $this->_safe_base64_encode($this->_sign($policy));
+        $query = [
+            'Expires' => $params['less_than'],
+            'Signature' => $signature,
+            'Key-Pair-Id' => $this->get_config('cf_keypair_id'),
+        ];
+        return $url . http_build_query($query, null, ini_get('arg_separator.output'), PHP_QUERY_RFC3986);
+    }
+
+    public function set_signed_cookies(array $params)
+    {
+        list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
+
+        $use_custom_policy ?
+            $this->_set_cookie(
+                'Policy',
+                $this->_safe_base64_encode($policy),
+                $path,
+                $secure
+            ) :
+            $this->_set_cookie(
+                'Expires',
+                $params['less_than'],
+                $path,
+                $secure
+            );
+
+        $this->_set_cookie(
+            'Signature',
+            $this->_safe_base64_encode($this->_sign($policy)),
+            $path,
+            $secure
+        );
+
+        $this->_set_cookie(
+            'Key-Pair-Id',
+            $this->get_config('cf_keypair_id'),
+            $path,
+            $secure
+        );
+
+        return true;
+    }
+
+    public function readfile($filename)
+    {
+        $args = [];
+        if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
+            $args['IfModifiedSince'] = $_SERVER['HTTP_IF_MODIFIED_SINCE'];
+        }
+        if (isset($_SERVER['HTTP_IF_NONE_MATCH'])) {
+            $args['IfNoneMatch'] = $_SERVER['HTTP_IF_NONE_MATCH'];
+        }
+        if (strpos($filename, self::$_s3_protocol) === 0) {
+            if (! preg_match('|^s3://([^/]+)/(.+)$|', $filename, $match)) {
+                return header('HTTP/1.0 404 Not Found');
+            }
+            class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
+            $result = $this->_CI->aws_lib->headObject($match[1], $match[2], $args);
+            if (empty($result)) {
+                return header('HTTP/1.0 404 Not Found');
+            }
+            $args['ETag'] = $result->get('ETag');
+            $args['LastModified'] = $result->get('LastModified') ? $result->get('LastModified')->format('D, d M Y H:i:s \G\M\T') : null;
+            $args['ContentType'] = $result->get('ContentType');
+            $args['ContentLength'] = $result->get('ContentLength');
+        } else {
+            $timestamp = filemtime($filename);
+            $args['ETag'] = '"' . md5('traditional chinese' . $timestamp) . '"';
+            $args['LastModified'] = gmdate('D, d M Y H:i:s \G\M\T', $timestamp);
+            $args['ContentType'] = null;
+            $args['ContentLength'] = filesize($filename);
+        }
+        if ((empty($args['IfNoneMatch']) || $args['ETag'] == $args['IfNoneMatch']) &&
+            (isset($args['IfModifiedSince']) && $args['LastModified'] == $args['IfModifiedSince'])
+        ) {
+            return header('HTTP/1.1 304 Not Modified');
+        }
+
+        $this->_CI->load->helper('file');
+
+        ob_start();
+        header('Cache-Control: private, max-age=31536000, pre-check=31536000');
+        header('Last-Modified: ' . $args['LastModified']);
+        header('ETag: ' . $args['ETag']);
+        header('Pragma: public');
+        header('Content-Type: ' . get_mime_by_extension($filename, $args['ContentType']));
+        header('Content-Length: ' . $args['ContentLength']);
+        ob_clean();
+        ob_end_flush();
+
+        readfile($filename);
+        exit; // Prevent CodeIgniter's output buffer.
+    }
+
+    public function sms($phone, $message)
+    {
+        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
+        return $this->_CI->aws_lib->publish([
+            'PhoneNumber' => $phone,
+            'Message' => $message,
+        ]);
+    }
+
+    public function publish($topic, $message, $subject = null)
+    {
+        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
+        return $this->_CI->aws_lib->publish([
+            'TopicArn' => $this->_config['sns_topic_prefix'] . $topic,
+            'Subject' => $subject,
+            'Message' => $message,
+        ]);
+    }
+
+    public function subscribe($endpoint, $protocol, $topic)
+    {
+        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
+        return $this->_CI->aws_lib->subscribe(
+            $endpoint,
+            $protocol,
+            $this->_config['sns_topic_prefix'] . $topic
+        );
+    }
+
+    public function s3_list($bucket, $prefix, $list_filename, array $filters = ['sed' => '/Thumbs\.db|\.DS_STORE/d'], $recursive = true)
+    {
+        $this->_CI->load->add_package_path(config_item('common_package'));
+        $this->_CI->load->library('process_lib');
+        $this->_CI->load->remove_package_path(config_item('common_package'));
+        $cmd = sprintf(
+            'aws s3 ls %s--summarize s3://%s/%s/ ',
+            $recursive ? '--recursive ' : null,
+            $bucket,
+            $prefix
+        );
+
+        foreach ($filters as $key => $pattern) {
+            $cmd .= sprintf(
+                '| %s "%s" ',
+                $key,
+                $pattern
+            );
+        }
+        $cmd .= '> ' . $list_filename;
+
+        set_time_limit(0);
+        $credentials = $this->_config['aws_config']['credentials'] ?? null;
+        isset($credentials['key']) && putenv('AWS_ACCESS_KEY_ID=' . $credentials['key']);
+        isset($credentials['secret']) && putenv('AWS_SECRET_ACCESS_KEY=' . $credentials['secret']);
+        $this->_CI->process_lib->execute($cmd);
+        return $list_filename;
+    }
+
+    private function _load_config($file)
+    {
+        $config = $this->_CI->config->item($file);
+        if (empty($config)) {
+            $this->_CI->config->load($file, true);
+        }
+        $config = $this->_CI->config->item($file);
+        return empty($config) ? [] : $config;
+    }
+
+    private function _presign_process(array &$params)
+    {
+        if (empty($params['url']) or
+            ! preg_match('|^(http[s\*]?):\/\/([^\/]+)(\/.*)$|', $params['url'], $match)
+        ) {
+            throw new Exception('Invalid parameters, no url found.', 400);
+        }
+        $use_custom_policy = strpos($match[3], '*') > 0;
+        $path = $use_custom_policy ?
+            substr($match[3], 0, strpos($match[3], '*')) :
+            $match[3];
+        $secure = $match[1] != 'http';
+        if (empty($params['less_than'])) {
+            $params['less_than'] = time() + config_item('sess_expiration');
+        }
+        return [
+            $use_custom_policy,
+            $path,
+            $secure,
+            $use_custom_policy ?
+                $this->_get_custom_policy($params) :
+                $this->_get_canned_policy($params)
+        ];
+    }
+
+    private function _get_custom_policy(array $params)
+    {
+        $policy = $this->_get_policy_statement($params);
+        if (isset($params['greater_than'])) {
+            $policy['Statement']['Condition']['DateGreaterThan'] = ['AWS:EpochTime' => $params['greater_than']];
+        }
+        if (isset($params['ip'])) {
+            $policy['Statement']['Condition']['IpAddress'] = $params['ip'];
+        }
+        return json_encode($policy, JSON_UNESCAPED_SLASHES);
+    }
+
+    private function _get_canned_policy(array $params)
+    {
+        return json_encode(
+            $this->_get_policy_statement($params),
+            JSON_UNESCAPED_SLASHES
+        );
+    }
+
+    private function _get_policy_statement(array $params)
+    {
+        return [
+            'Statement' => [[
+                'Resource' => $params['url'],
+                'Condition' => [
+                    'DateLessThan' => [
+                        'AWS:EpochTime' => $params['less_than']
+                    ]
+                ]
+            ]]
+        ];
+    }
+
+    private function _safe_base64_encode($content)
+    {
+        return str_replace(['+', '=', '/'], ['-', '_', '~'], base64_encode($content));
+    }
+
+    private function _sign($data)
+    {
+        if (empty(self::$_priv_key)) {
+            if (!is_readable($this->get_config('cf_pk_pathname'))) {
+                return null;
+            }
+            self::$_priv_key = openssl_get_privatekey('file://' . $this->get_config('cf_pk_pathname'));
+        }
+        $signature = null;
+        openssl_sign($data, $signature, self::$_priv_key);
+
+        return $signature;
+    }
+
+    private function _set_cookie($name, $value, $path, $secure = true)
+    {
+        setcookie(
+            'CloudFront-' . $name,
+            $value,
+            0,
+            $path,
+            $_SERVER['DOMAIN'],
+            $secure,
+            true
+        );
+    }
+
+    private function _cli_to_cmd($cli)
+    {
+        $command = $this->_config['eb_cli'];
+        if (is_string($cli)) {
+            $command .= ' ' . $cli;
+        } elseif (isset($cli['class'])) {
+            if (! empty($cli['path'])) {
+                $command .= ' ' . implode(' ', (array)$cli['path']);
+            }
+            $command .= ' ' . $cli['class'];
+            $command .= ' ' . ((empty($cli['method']) or ! is_string($cli['method'])) ? 'index' : $cli['method']);
+            if (isset($cli['parameters'])) {
+                $command .= ' ' . (is_array($cli['parameters']) ? implode(' ', $cli['parameters']) : $cli['parameters']);
+            }
+        } else {
+            return false;
+        }
+        return $command;
     }
 
     private function _s3_key_ebook(array &$segments, array $params)
@@ -479,344 +817,6 @@ class Aws_util
                 rtrim(base64_encode($binary), '=')
             );
         }
-    }
-
-    public function s3_key(array $params, $mode = 'ebook', $use_cf = false, $trailing_slash = true)
-    {
-        $segments = [
-            self::$_s3_protocol . (
-                $use_cf ?
-                    $this->_config['cf_bucket'] :
-                    $this->_config['s3_bucket']
-            ),
-            $mode
-        ];
-        switch ($mode) {
-            case 'ebook':
-            case 'book':
-            case 'campaign':
-            case 'doc':
-            case 'api':
-            case 'media_file':
-            case 'user_reading_file':
-            case 'feedback':
-                $function = '_s3_key_' . $mode;
-                $this->{$function}($segments, $params);
-                break;
-
-            case 'full':
-            case 'preview':
-            case 'manual':
-                $this->_s3_key_ebook_file($mode, $segments, $params);
-                break;
-
-            case 'cover':
-            case 'social/cover':
-            case 'share/cover':
-                $this->_s3_key_cover($mode, $segments, $params);
-                break;
-
-            case 'lcp':
-                $this->_s3_key_epub($mode, $segments, $params);
-                break;
-
-            default:
-                $this->_CI->load->helper('print');
-                foreach ($this->_config['s3_key'] as $key => $value) {
-                    if ($key == $mode or preg_match(sprintf('!%s!', $key), $mode)) {
-                        (isset($value['validate']) && empty($value['validate'])) or
-                        array_walk($params, function ($var) {
-                            if (empty($var)) {
-                                throw new Exception('Invalid args.', 1);
-                            }
-                        });
-
-                        if (isset($value['trailing_slash'])) {
-                            $trailing_slash = $value['trailing_slash'];
-                        }
-
-                        $result = vnsprintf($value['format'], $params);
-                        if (! empty($result)) {
-                            $segments[] = $result;
-                        }
-                        break 2;
-                    }
-                }
-                return null;
-        }
-        if ($trailing_slash) {
-            $segments[] = '';
-        }
-        return implode('/', $segments);
-    }
-
-    private function _load_config($file)
-    {
-        $config = $this->_CI->config->item($file);
-        if (empty($config)) {
-            $this->_CI->config->load($file, true);
-        }
-        $config = $this->_CI->config->item($file);
-        return empty($config) ? [] : $config;
-    }
-
-    public function get_config($key)
-    {
-        return $this->_config[$key];
-    }
-
-    public function set_config($key, $value)
-    {
-        $this->_config[$key] = $value;
-    }
-
-    private function _presign_process(array &$params)
-    {
-        if (empty($params['url']) or
-            ! preg_match('|^(http[s\*]?):\/\/([^\/]+)(\/.*)$|', $params['url'], $match)
-        ) {
-            throw new Exception('Invalid parameters, no url found.', 400);
-        }
-        $use_custom_policy = strpos($match[3], '*') > 0;
-        $path = $use_custom_policy ?
-            substr($match[3], 0, strpos($match[3], '*')) :
-            $match[3];
-        $secure = $match[1] != 'http';
-        if (empty($params['less_than'])) {
-            $params['less_than'] = time() + config_item('sess_expiration');
-        }
-        return [
-            $use_custom_policy,
-            $path,
-            $secure,
-            $use_custom_policy ?
-                $this->_get_custom_policy($params) :
-                $this->_get_canned_policy($params)
-        ];
-    }
-
-    public function get_signed_url(array $params)
-    {
-        $url = $params['url'] . '?';
-        $params['url'] = str_replace('http://', 'http*://', $params['url']);
-        list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
-        $signature = $this->_safe_base64_encode($this->_sign($policy));
-        $query = [
-            'Expires' => $params['less_than'],
-            'Signature' => $signature,
-            'Key-Pair-Id' => $this->get_config('cf_keypair_id'),
-        ];
-        return $url . http_build_query($query, null, ini_get('arg_separator.output'), PHP_QUERY_RFC3986);
-    }
-
-    public function set_signed_cookies(array $params)
-    {
-        list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
-
-        $use_custom_policy ?
-            $this->_set_cookie(
-                'Policy',
-                $this->_safe_base64_encode($policy),
-                $path,
-                $secure
-            ) :
-            $this->_set_cookie(
-                'Expires',
-                $params['less_than'],
-                $path,
-                $secure
-            );
-
-        $this->_set_cookie(
-            'Signature',
-            $this->_safe_base64_encode($this->_sign($policy)),
-            $path,
-            $secure
-        );
-
-        $this->_set_cookie(
-            'Key-Pair-Id',
-            $this->get_config('cf_keypair_id'),
-            $path,
-            $secure
-        );
-
-        return true;
-    }
-
-    private function _get_custom_policy(array $params)
-    {
-        $policy = $this->_get_policy_statement($params);
-        if (isset($params['greater_than'])) {
-            $policy['Statement']['Condition']['DateGreaterThan'] = ['AWS:EpochTime' => $params['greater_than']];
-        }
-        if (isset($params['ip'])) {
-            $policy['Statement']['Condition']['IpAddress'] = $params['ip'];
-        }
-        return json_encode($policy, JSON_UNESCAPED_SLASHES);
-    }
-
-    private function _get_canned_policy(array $params)
-    {
-        return json_encode(
-            $this->_get_policy_statement($params),
-            JSON_UNESCAPED_SLASHES
-        );
-    }
-
-    private function _get_policy_statement(array $params)
-    {
-        return [
-            'Statement' => [[
-                'Resource' => $params['url'],
-                'Condition' => [
-                    'DateLessThan' => [
-                        'AWS:EpochTime' => $params['less_than']
-                    ]
-                ]
-            ]]
-        ];
-    }
-
-    private function _safe_base64_encode($content)
-    {
-        return str_replace(['+', '=', '/'], ['-', '_', '~'], base64_encode($content));
-    }
-
-    private function _sign($data)
-    {
-        if (empty(self::$_priv_key)) {
-            if (!is_readable($this->get_config('cf_pk_pathname'))) {
-                return null;
-            }
-            self::$_priv_key = openssl_get_privatekey('file://' . $this->get_config('cf_pk_pathname'));
-        }
-        $signature = null;
-        openssl_sign($data, $signature, self::$_priv_key);
-
-        return $signature;
-    }
-
-    private function _set_cookie($name, $value, $path, $secure = true)
-    {
-        setcookie(
-            'CloudFront-' . $name,
-            $value,
-            0,
-            $path,
-            $_SERVER['DOMAIN'],
-            $secure,
-            true
-        );
-    }
-
-    public function readfile($filename)
-    {
-        $args = [];
-        if (isset($_SERVER['HTTP_IF_MODIFIED_SINCE'])) {
-            $args['IfModifiedSince'] = $_SERVER['HTTP_IF_MODIFIED_SINCE'];
-        }
-        if (isset($_SERVER['HTTP_IF_NONE_MATCH'])) {
-            $args['IfNoneMatch'] = $_SERVER['HTTP_IF_NONE_MATCH'];
-        }
-        if (strpos($filename, self::$_s3_protocol) === 0) {
-            if (! preg_match('|^s3://([^/]+)/(.+)$|', $filename, $match)) {
-                return header('HTTP/1.0 404 Not Found');
-            }
-            class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
-            $result = $this->_CI->aws_lib->headObject($match[1], $match[2], $args);
-            if (empty($result)) {
-                return header('HTTP/1.0 404 Not Found');
-            }
-            $args['ETag'] = $result->get('ETag');
-            $args['LastModified'] = $result->get('LastModified') ? $result->get('LastModified')->format('D, d M Y H:i:s \G\M\T') : null;
-            $args['ContentType'] = $result->get('ContentType');
-            $args['ContentLength'] = $result->get('ContentLength');
-        } else {
-            $timestamp = filemtime($filename);
-            $args['ETag'] = '"' . md5('traditional chinese' . $timestamp) . '"';
-            $args['LastModified'] = gmdate('D, d M Y H:i:s \G\M\T', $timestamp);
-            $args['ContentType'] = null;
-            $args['ContentLength'] = filesize($filename);
-        }
-        if ((empty($args['IfNoneMatch']) || $args['ETag'] == $args['IfNoneMatch']) &&
-            (isset($args['IfModifiedSince']) && $args['LastModified'] == $args['IfModifiedSince'])
-        ) {
-            return header('HTTP/1.1 304 Not Modified');
-        }
-
-        $this->_CI->load->helper('file');
-
-        ob_start();
-        header('Cache-Control: private, max-age=31536000, pre-check=31536000');
-        header('Last-Modified: ' . $args['LastModified']);
-        header('ETag: ' . $args['ETag']);
-        header('Pragma: public');
-        header('Content-Type: ' . get_mime_by_extension($filename, $args['ContentType']));
-        header('Content-Length: ' . $args['ContentLength']);
-        ob_clean();
-        ob_end_flush();
-
-        readfile($filename);
-        exit; // Prevent CodeIgniter's output buffer.
-    }
-
-    public function sms($phone, $message)
-    {
-        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
-        return $this->_CI->aws_lib->publish([
-            'PhoneNumber' => $phone,
-            'Message' => $message,
-        ]);
-    }
-
-    public function publish($topic, $message, $subject = null)
-    {
-        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
-        return $this->_CI->aws_lib->publish([
-            'TopicArn' => $this->_config['sns_topic_prefix'] . $topic,
-            'Subject' => $subject,
-            'Message' => $message,
-        ]);
-    }
-
-    public function subscribe($endpoint, $protocol, $topic)
-    {
-        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
-        return $this->_CI->aws_lib->subscribe(
-            $endpoint,
-            $protocol,
-            $this->_config['sns_topic_prefix'] . $topic
-        );
-    }
-
-    public function s3_list($bucket, $prefix, $list_filename, array $filters = ['sed' => '/Thumbs\.db|\.DS_STORE/d'], $recursive = true)
-    {
-        $this->_CI->load->add_package_path(config_item('common_package'));
-        $this->_CI->load->library('process_lib');
-        $this->_CI->load->remove_package_path(config_item('common_package'));
-        $cmd = sprintf(
-            'aws s3 ls %s--summarize s3://%s/%s/ ',
-            $recursive ? '--recursive ' : null,
-            $bucket,
-            $prefix
-        );
-
-        foreach ($filters as $key => $pattern) {
-            $cmd .= sprintf(
-                '| %s "%s" ',
-                $key,
-                $pattern
-            );
-        }
-        $cmd .= '> ' . $list_filename;
-
-        set_time_limit(0);
-        $credentials = $this->_config['aws_config']['credentials'] ?? null;
-        isset($credentials['key']) && putenv('AWS_ACCESS_KEY_ID=' . $credentials['key']);
-        isset($credentials['secret']) && putenv('AWS_SECRET_ACCESS_KEY=' . $credentials['secret']);
-        $this->_CI->process_lib->execute($cmd);
-        return $list_filename;
     }
 }
 // END Aws_util Class
