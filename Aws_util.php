@@ -505,14 +505,14 @@ class Aws_util
         $matched_connections = array_filter(
             $result['items'],
             function ($item) use ($uuid) {
-                return ($item['eventId'] ?? null) == $uuid;
+                return current($item['eventId']) == $uuid;
             }
         );
 
         return array_map(
             function ($item) use ($data) {
                 return $this->_CI->aws_lib->postToConnection(
-                    $item['connectionId'],
+                    current($item['connectionId']),
                     $data
                 );
             },

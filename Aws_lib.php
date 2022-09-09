@@ -723,11 +723,18 @@ class Aws_lib
     public function postToConnection(string $connectionId, $data)
     {
         try {
-            return $this->get_client('ApiGatewayManagementApi')->postToConnection([
+            $client = $this->get_client(
+                'ApiGatewayManagementApi',
+                [
+                    'apiVersion' => '2018-11-29',
+                    'endpoint' => $this->_CI->config->item('connection_endpoint', 'aws'),
+                ]
+            );
+            return $client->postToConnection([
                 'ConnectionId' => $connectionId,
                 'Data' => $data,
             ]);
-        } catch (ApiGatewayManagementApiException $e) {
+        } catch (Exception $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
@@ -971,10 +978,10 @@ class Aws_lib
         }
     }
 
-    public function get_client($name)
+    public function get_client($name, $options = null)
     {
         if (!isset($this->_client_pool[$name])) {
-            $this->_client_pool[$name] = $this->_sdk->{'create' . $name}();
+            $this->_client_pool[$name] = $this->_sdk->{'create' . $name}($options);
         }
         return $this->_client_pool[$name];
     }
