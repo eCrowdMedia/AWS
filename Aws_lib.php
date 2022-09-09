@@ -961,6 +961,48 @@ class Aws_lib
         return $this->_client_pool[$name];
     }
 
+    /*
+     * https://docs.aws.amazon.com/zh_tw/sdk-for-php/v3/developer-guide/secretsmanager-examples-manage-secret.html
+     */
+    public function createSecret($name, $secret, $description = null)
+    {
+        if (empty($name) || empty($secret)) {
+            return;
+        }
+
+        try {
+            $result = $this->get_client('SecretsManager')->createSecret([
+                'Description' => $description,
+                'Name' => $name,
+                'SecretString' => $secret,
+            ]);
+        } catch (AwsException $e) {
+            $result['error_msg'] = $e->getMessage();
+        }
+        return $result;
+    }
+
+    public function getSecretValue($name)
+    {
+        if (empty($name)) {
+            return;
+        }
+
+        try {
+            $result = $this->get_client('SecretsManager')->getSecretValue([
+                'SecretId' => $name,
+            ]);
+            if (isset($result['SecretString'])) {
+                $secret = $result['SecretString'];
+            } else {
+                $secret = base64_decode($result['SecretBinary']);
+            }
+        } catch (AwsException $e) {
+            $result['error_msg'] = $e->getAwsErrorCode();
+        }
+        return $secret;
+    }
+
     private function _valid_endpoint($endpoint, $protocol)
     {
         switch ($protocol) {
