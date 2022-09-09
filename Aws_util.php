@@ -489,6 +489,37 @@ class Aws_util
         return $list_filename;
     }
 
+    public function notify_event($uuid, $data)
+    {
+        class_exists('Aws_lib') or $this->_CI->load->library('aws/aws_lib');
+        $result = $this->_CI->aws_lib->queryScan([
+            'TableName' => $this->_config['event_tablename'],
+            'ProjectionExpression' => 'connectionId, eventId',
+        ]);
+        if (!isset($result['items'])) {
+            throw new Exception('No event DynamoDB found.');
+        } elseif ($result['count'] == 0) {
+            return;
+        }
+
+        $matched_connections = array_filter(
+            $result['items'],
+            function ($item) use ($uuid) {
+                return ($item['eventId'] ?? null) == $uuid;
+            }
+        );
+
+        return array_map(
+            function ($item) use ($data) {
+                return $this->_CI->aws_lib->postToConnection(
+                    $item['connectionId'],
+                    $data
+                );
+            },
+            $matched_connections
+        );
+    }
+
     private function _load_config($file)
     {
         $config = $this->_CI->config->item($file);

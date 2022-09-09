@@ -714,6 +714,24 @@ class Aws_lib
         }
     }
 
+
+    /**
+     * @method \Aws\Result postToConnection(array $args = [])
+    'ConnectionId' => '<string>', // REQUIRED
+    'Data' => <string || resource || Psr\Http\Message\StreamInterface>, // REQUIRED
+     */
+    public function postToConnection(string $connectionId, $data)
+    {
+        try {
+            return $this->get_client('ApiGatewayManagementApi')->postToConnection([
+                'ConnectionId' => $connectionId,
+                'Data' => $data,
+            ]);
+        } catch (ApiGatewayManagementApiException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
     /*
      * @class SqsClient
      *
