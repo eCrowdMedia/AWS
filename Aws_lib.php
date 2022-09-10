@@ -714,6 +714,31 @@ class Aws_lib
         }
     }
 
+
+    /**
+     * @method \Aws\Result postToConnection(array $args = [])
+    'ConnectionId' => '<string>', // REQUIRED
+    'Data' => <string || resource || Psr\Http\Message\StreamInterface>, // REQUIRED
+     */
+    public function postToConnection(string $connectionId, $data)
+    {
+        try {
+            $client = $this->get_client(
+                'ApiGatewayManagementApi',
+                [
+                    'apiVersion' => '2018-11-29',
+                    'endpoint' => $this->_CI->config->item('connection_endpoint', 'aws'),
+                ]
+            );
+            return $client->postToConnection([
+                'ConnectionId' => $connectionId,
+                'Data' => $data,
+            ]);
+        } catch (Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
     /*
      * @class SqsClient
      *
@@ -953,10 +978,10 @@ class Aws_lib
         }
     }
 
-    public function get_client($name)
+    public function get_client($name, $options = null)
     {
         if (!isset($this->_client_pool[$name])) {
-            $this->_client_pool[$name] = $this->_sdk->{'create' . $name}();
+            $this->_client_pool[$name] = $this->_sdk->{'create' . $name}($options);
         }
         return $this->_client_pool[$name];
     }
