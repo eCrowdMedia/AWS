@@ -505,7 +505,7 @@ class Aws_util
         $matched_connections = array_filter(
             $result['items'],
             function ($item) use ($uuid) {
-                return current($item['eventId']) == $uuid;
+                return current($item['eventId'] ?? []) == $uuid;
             }
         );
 
