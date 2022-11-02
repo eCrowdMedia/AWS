@@ -6,20 +6,20 @@ use Aws\CognitoIdentityProvider\Exception\CognitoIdentityProviderException;
 
 class cognito_test
 {
-    protected $client_id            = '<client id>';
-    protected $client_secret        = '<client secret>';
-    protected $user_pool_id         = '<user pool id>';
-    protected $iam_access_key       = '<access key>';
-    protected $iam_access_secret    = '<access secret>';
+    protected $client_id            = '';
+    protected $client_secrect       = '';
+    protected $user_pool_id         = '';
+    protected $iam_access_key       = '';
+    protected $iam_access_secret    = '';
 
-    protected $region               = '<region>';
-    protected $version              = 'latest';
-    protected $grant_type           = 'authorization_code';
-    protected $response_type        = 'code';
+    protected $region               = '';
+    protected $version              = '';
+    protected $grant_type           = '';
+    protected $response_type        = '';
     protected $scope                = '';
 
-    protected $redirect_uri         = 'https://localhost.readmoo/test_api.php';
-    protected $cognito_domain       = 'https://testapp001.auth.<region>.amazoncognito.com';
+    protected $redirect_uri         = '';
+    protected $cognito_domain       = '';
     protected $code                 = '';
     protected $authorize            = 0;
     protected $login                = 0;
@@ -33,6 +33,19 @@ class cognito_test
     public function __construct()
     {
         session_start();
+        $this->env_data = include_once("test_api_env.php");
+
+        $this->client_id            = $this->env_data['general']['client_id'];
+        $this->client_secrect       = $this->env_data['general']['client_secret'];
+        $this->user_pool_id         = $this->env_data['general']['user_pool_id'];
+        $this->iam_access_key       = $this->env_data['general']['iam_access_key'];
+        $this->iam_access_secret    = $this->env_data['general']['iam_access_secret'];
+        $this->region               = $this->env_data['general']['region'];
+        $this->version              = $this->env_data['general']['version'];
+        $this->redirect_uri         = $this->env_data['endpoint']['redirect_uri'];
+        $this->grant_type           = $this->env_data['endpoint']['grant_type'];
+        $this->response_type        = $this->env_data['endpoint']['response_type'];
+        $this->cognito_domain       = $this->env_data['endpoint']['cognito_domain'];
 
         if (isset($_GET['code']) and !empty($_GET['code'])) {
             $this->code = $_GET['code'];
@@ -49,6 +62,9 @@ class cognito_test
         if (isset($_GET['info']) and !empty($_GET['info'])) {
             $this->info = trim($_GET['info']);
         }
+        if (isset($_GET['refresh']) and !empty($_GET['refresh'])) {
+            $this->refresh = trim($_GET['refresh']);
+        }
 
         if (isset($_GET['sdk']) and !empty($_GET['sdk'])) {
             $_SESSION['scope'] = 'aws.cognito.signin.user.admin';
@@ -60,7 +76,7 @@ class cognito_test
         $this->scope = $_SESSION['scope'];
 
         // 更新access_token
-        $this->_refresh_token();
+        $this->_refresh_accesss_token();
     }
 
     /**
@@ -137,6 +153,11 @@ class cognito_test
             $this->_user_logout();
         }
 
+        // 使用 refresh token
+        if ($this->refresh == 1) {
+            $this->_refresh_token();
+        }
+
     }
 
     /**
@@ -157,31 +178,36 @@ class cognito_test
     /**
      * 取得 access_token
      */
-    private function _get_access_token()
+    private function _get_access_token(string $grant_type = '', string $refresh_token = '')
     {
         // 準備參數
-        $query = http_build_query([
+        $query = [
             'code'          => $this->code,
-            'grant_type'    => $this->grant_type,
+            'grant_type'    => !empty($grant_type) ? $grant_type : $this->grant_type,
             'redirect_uri'  => $this->redirect_uri,
-        ]);
+        ];
+
+        if (!empty($refresh_token)) {
+            $query['refresh_token'] = $refresh_token;
+        }
 
         $url = $this->cognito_domain.'/oauth2/token';
         $method = 'POST';
         $header = [
-            'Authorization: Basic '.base64_encode($this->client_id.':'.$this->client_secret),
+            'Authorization: Basic '.base64_encode($this->client_id.':'.$this->client_secrect),
             'Content-Type: application/x-www-form-urlencoded'
         ];
 
         // 執行 curl
-        $token_result = $this->_curl_operation($url, $method, $query, $header);
+        $token_result = $this->_curl_operation($url, $method, http_build_query($query), $header);
         $all_token_decode = json_decode($token_result);
 
         // 寫到 session
         $this->_set_session([
-            'access_token'          => $all_token_decode->access_token,
+            'get_all_token'         => $all_token_decode,
             'get_token_datetime'    => date('Y-m-d H:i:s'),
-            'code'                  => $this->code
+            'code'                  => $this->code,
+            'access_token'          => $all_token_decode->access_token
         ]);
 
         return $all_token_decode;
@@ -223,6 +249,8 @@ class cognito_test
     private function _user_logout()
     {
         $this->_unset_session([
+            'all_token',
+            'get_all_token',
             'access_token',
             'get_token_datetime',
             'code',
@@ -265,15 +293,16 @@ class cognito_test
     }
 
     /**
-     * 更新token
+     * 更新 access_token
      */
-    private function _refresh_token()
+    private function _refresh_accesss_token()
     {
         if (!empty($this->code) and $_SESSION['code'] != $this->code) {
             $this->_set_session([
-                'access_token'          => $this->_get_access_token()->access_token,
+                'get_all_token'         => $this->_get_access_token(),
                 'get_token_datetime'    => date('Y-m-d H:i:s'),
-                'code'                  => $this->code
+                'code'                  => $this->code,
+                'access_token'          => $_SESSION['access_token']
             ]);
         }
 
@@ -282,39 +311,65 @@ class cognito_test
     }
 
     /**
+     * 更新 all_token
+     */
+    private function _refresh_token()
+    {
+        $grant_type = 'refresh_token';
+        $refresh_token = $_SESSION['get_all_token']->refresh_token;
+        $result = $this->_get_access_token($grant_type, $refresh_token);
+
+        $this->code = $_SESSION['code'];
+        $this->access_token = $result->access_token;
+    }
+
+    /**
      * 頁面操作按鈕
      */
     public function operation_button()
     {
         echo '<a href="?authorize=1" style="float:left;">
-                <div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">get authorize</div>
+            <div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">get authorize</div>
             </a>';
 
-        echo '<a href="?login=1" style="float:left;"><div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">login</div>
+        echo '<a href="?login=1" style="float:left;">
+            <div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">login</div>
             </a>';
 
-        echo '<a href="?logout=1" style="float:left;"><div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">logout</div>
-        </a>';
+        echo '<a href="?logout=1" style="float:left;">
+            <div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">logout</div>
+            </a>';
+
+        echo '<a href="?refresh=1" style="float:left;">
+            <div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">refresh Token</div>
+            </a>';
 
         if ($this->scope == 'openid') {
-            echo '<a href="?sdk=1" style="float:left;"><div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">switch sdk type</div>
-            </a>';
+            echo '<a href="?sdk=1" style="float:left;">
+                <div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">switch sdk type</div>
+                </a>';
         } else {
-            echo '<a href="?default=1" style="float:left;"><div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">switch endpoint type</div>
-            </a>';
+            echo '<a href="?default=1" style="float:left;">
+                <div style="padding:10px;margin:0 3px 0 0;cursor:pointer;background-color:#efefef;border:1px solid #aaa;">switch endpoint type</div>
+                </a>';
         }
 
         echo '<div style="clear:both;"></div>';
 
-        echo '<div style="color:red;">current type: '.$this->scope.'</div>';
+        if (!empty($this->scope)) {
+            echo '<div style="color:red;">current type: '.$this->scope.'</div>';
+        }
 
         if (!isset($this->access_token)) {
             echo '尚未取得 user 資料';
         }
 
-        echo '<h3><b>SESSION DATA</b></h3>';
-        $this->output($_SESSION);
+        if (count($_SESSION) > 0) {
+            echo '<h3><b>SESSION DATA</b></h3>';
+            $this->output($_SESSION);
             echo '<BR>';
+        }
+
     }
 
     /**
