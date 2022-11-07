@@ -2,6 +2,7 @@
 require_once('../vendor/autoload.php');
 use Aws\CognitoIdentityProvider\CognitoIdentityProviderClient;
 use Aws\CognitoIdentityProvider\Exception\CognitoIdentityProviderException;
+use Aws\CognitoIdentityProvider\ValueObject\AttributeType;
 
 use Aws\CognitoIdentity\CognitoIdentityClient;
 use Aws\CognitoIdentity\Exception\CognitoIdentityException;
@@ -36,6 +37,7 @@ class cognito_test
         $this->client_id            = $this->env_data['general']['client_id'];
         $this->client_secret        = $this->env_data['general']['client_secret'];
         $this->user_pool_id         = $this->env_data['general']['user_pool_id'];
+        $this->identity_id          = $this->env_data['sdk']['identity_id'];
         $this->identity_pool_id     = $this->env_data['sdk']['identity_pool_id'];
         $this->iam_access_key       = $this->env_data['general']['iam_access_key'];
         $this->iam_access_secret    = $this->env_data['general']['iam_access_secret'];
@@ -53,15 +55,55 @@ class cognito_test
         ];
 
         $this->identity_provider_client = new CognitoIdentityProviderClient($this->default_config);
+        $this->identity_client = new CognitoIdentityClient($this->default_config);
 
         if (isset($_GET['signout']) or $_GET['signout'] == 1) {
             $this->global_signout();
             $this->_user_logout();
         }
 
+        if (isset($_GET['revoke_token']) or $_GET['revoke_token'] == 1) {
+            $this->revoke_token();
+            $this->_user_logout();
+        }
+
+        if (isset($_GET['create_user']) or $_GET['create_user'] == 1) {
+            $this->create_user();
+        }
+
+        if (isset($_GET['delete_user']) or $_GET['delete_user'] == 1) {
+            $this->delete_user();
+        }
+
         s($_POST);
         if (!empty($_POST['username']) and !empty($_POST['password'])) {
             $this->main_identity_provider($_POST['username'], $_POST['password']);
+        }
+    }
+
+
+    public function google_login()
+    {
+        // create Client Request to access Google API
+        $client = new Google_Client();
+        $client->setAuthConfig('client_secret_385299543889.json');
+        $client->addScope("email");
+        $client->addScope("profile");
+
+        // authenticate code from Google OAuth Flow
+        if (isset($_GET['code'])) {
+            $token = $client->fetchAccessTokenWithAuthCode($_GET['code']);
+            $client->setAccessToken($token['access_token']);
+            sd($token);
+            // get profile info
+            // $google_oauth = new Google_Service_Oauth2($client);
+            // $google_account_info = $google_oauth->userinfo->get();
+            // $email =  $google_account_info->email;
+            // $name =  $google_account_info->name;
+
+            // now you can use this profile info to create account in your website and make user logged in.
+        } else {
+            echo "<a href='".$client->createAuthUrl()."'>Google Login</a>";
         }
     }
 
@@ -89,9 +131,13 @@ class cognito_test
 
             $fb_access_token = $this->check_fb_token($accessToken, $fb, $app_id);
 
-            $response = $fb->get('/me', $fb_access_token);
 
-            sd($response->getGraphUser()->getId());
+
+            return $fb_access_token;
+
+            // $response = $fb->get('/me', $fb_access_token);
+
+            // sd($response->getGraphUser()->getId());
         } catch(\Facebook\Exceptions\FacebookResponseException $e) {
             // When Graph returns an error
             echo 'Graph returned an error: ' . $e->getMessage();
@@ -142,7 +188,7 @@ class cognito_test
             var_dump($accessToken->getValue());
         }
 
-          return (string)$accessToken->getValue();
+        return (string)$accessToken->getValue();
     }
 
     /**
@@ -172,8 +218,6 @@ class cognito_test
     public function main_identity()
     {
         try{
-            $this->identity_client = new CognitoIdentityClient($this->default_config);
-
             $result = $this->identity_client->getId([
                 'IdentityPoolId' => $this->identity_pool_id,
             ]);
@@ -272,10 +316,85 @@ class cognito_test
         header('Location: '.$this->redirect_url);
     }
 
+    public function revoke_token()
+    {
+        try{
+            $this->identity_provider_client->revokeToken([
+                'Token' => 'refresh_token',
+                'ClientId' => $this->env_data['general']['client_id'],
+                'ClientSecret' => $this->env_data['general']['client_secret'],
+            ]);
+        } catch (CognitoIdentityProviderException $exception) {
+            echo '<pre>';print_r($exception->getMessage());exit;
+        }
+    }
+
+    public function create_user()
+    {
+        try {
+            $this->identity_provider_client->adminCreateUser([
+                'UserPoolId' => $this->user_pool_id,
+                'Username' => 'QWE123',
+                'TemporaryPassword' => 'QWEqwe123!@#',
+                'UserAttributes' => [
+                    [
+                        "Name" => "email",
+                        "Value" => "QWE123-test@gmail.com"
+                    ]
+                ]
+            ]);
+        } catch (CognitoIdentityProviderException $exception) {
+            echo '<pre>';print_r($exception->getMessage());exit;
+        }
+
+        return true;
+    }
+
+    public function delete_user()
+    {
+        try{
+            $this->identity_provider_client->adminDeleteUser([
+                'UserPoolId' => $this->user_pool_id,
+                'Username' => 'QWE123',
+            ]);
+        } catch (CognitoIdentityProviderException $exception) {
+            echo '<pre>';print_r($exception->getMessage());exit;
+        }
+
+        header('Location: '.$this->redirect_url);
+    }
+
+    /**
+     * user 點擊使用 fb 登入，拿 fb token 再向 cognito 取token
+     */
+    public function get_id_by_fb()
+    {
+        $fb = $this->fb_login();
+        // sd($fb);
+
+        // $qq = $this->identity_client->getId([
+        //     'AccountId' => '430124335147',
+        //     'IdentityPoolId' => 'ap-northeast-1:71f145a2-28a4-4094-be32-20aefb6a9c1a',
+        //     'Logins' => [
+        //         'graph.facebook.com' => $fb
+        //     ]
+        // ]);
+        $qq = $this->identity_client->getOpenIdToken([
+            'IdentityId' => $this->identity_id,
+            'Logins' => [
+                'graph.facebook.com' => $fb
+            ]
+        ]);
+
+        sd($qq);
+    }
+
     public function operator()
     {
         if (isset($_SESSION['access_token'])) {
+            echo ' == ';
             echo '<a href="?signout=1">sign out</a>';
+            echo ' == ';
 
             // 取單一 user
             $result = $this->get_user($_SESSION['access_token']);
@@ -283,8 +402,15 @@ class cognito_test
             // 取 user 列表
             $list_users_result = $this->list_users();
 
-            sd($result, $list_users_result);
+            sd($_SESSION, $result, $list_users_result);
         }
+
+        echo ' == ';
+        echo '<a href="?revoke_token=1">Revoke token</a>';
+        echo ' == ';
+        echo '<a href="?create_user=1">create user</a>';
+        echo ' == ';
+        echo '<a href="?delete_user=1">delete user</a>';
 
         echo '<form action="" method="POST">';
         echo '帳號：<input type="text" value="" name="username">';
@@ -292,6 +418,8 @@ class cognito_test
         echo '密碼：<input type="text" value="" name="password">';
         echo '<input type="submit" value="submit" name="submit">';
         echo '</form>';
+
+        $this->get_id_by_fb();
     }
 
     /**
@@ -317,6 +445,8 @@ class cognito_test
 
 $cognito_test = new cognito_test();
 $cognito_test->operator();
+// $cognito_test->get_id_by_fb();
 // $cognito_test->main_identity_provider();
 // $cognito_test->main_identity();
 // $cognito_test->fb_login();
+// $cognito_test->google_login();
