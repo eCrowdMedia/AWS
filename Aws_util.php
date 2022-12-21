@@ -664,8 +664,12 @@ class Aws_util
 
             if (strpos($setting['path'], 'd/') === 0) {
                 $segments = [
-                    self::$_s3_protocol . 'epub.readmoo.' . ENVIRONMENT,
-                    $setting['path']
+                    sprintf(
+                        '%sepub.readmoo.%s',
+                        self::$_s3_protocol,
+                        ENVIRONMENT == 'production' ? 'com' : 'tw'
+                    ),
+                    rtrim($setting['path'], '/'),
                 ];
             } else {
                 $segments[] = sprintf(
