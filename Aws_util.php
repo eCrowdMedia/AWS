@@ -661,11 +661,19 @@ class Aws_util
             $setting = is_string($file['setting']) ?
                 json_decode($file['setting'], true) :
                 $file['setting'];
-            $segments[] = sprintf(
-                '%d_%d',
-                $file['version'],
-                isset($setting['revision']) ? $setting['revision'] : 0
-            );
+
+            if (strpos($setting['path'], 'd/') === 0) {
+                $segments = [
+                    self::$_s3_protocol . 'epub.readmoo.' . ENVIRONMENT,
+                    $setting['path']
+                ];
+            } else {
+                $segments[] = sprintf(
+                    '%d_%d',
+                    $file['version'],
+                    isset($setting['revision']) ? $setting['revision'] : 0
+                );
+            }
         }
         // manifestataion
         elseif (isset($params['manifestation'])) {
