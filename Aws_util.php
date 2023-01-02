@@ -662,7 +662,7 @@ class Aws_util
                 json_decode($file['setting'], true) :
                 $file['setting'];
 
-            if (strpos($setting['path'], 'd/') === 0) {
+            if (strpos($setting['path'], 'e/') === 0) {
                 $segments = [
                     sprintf(
                         '%sepub.readmoo.%s',
