@@ -661,11 +661,23 @@ class Aws_util
             $setting = is_string($file['setting']) ?
                 json_decode($file['setting'], true) :
                 $file['setting'];
-            $segments[] = sprintf(
-                '%d_%d',
-                $file['version'],
-                isset($setting['revision']) ? $setting['revision'] : 0
-            );
+
+            if (strpos($setting['path'], 'e/') === 0) {
+                $segments = [
+                    sprintf(
+                        '%sepub.readmoo.%s',
+                        self::$_s3_protocol,
+                        ENVIRONMENT == 'production' ? 'com' : 'tw'
+                    ),
+                    rtrim($setting['path'], '/'),
+                ];
+            } else {
+                $segments[] = sprintf(
+                    '%d_%d',
+                    $file['version'],
+                    isset($setting['revision']) ? $setting['revision'] : 0
+                );
+            }
         }
         // manifestataion
         elseif (isset($params['manifestation'])) {
