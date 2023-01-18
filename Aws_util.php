@@ -509,15 +509,6 @@ class Aws_util
             }
         );
 
-        //找出沒有 eventId 的 connectionId
-        if (is_array($matched_connections) and count($matched_connections) <= 0) {
-            foreach ($result['items'] as $key => $row) {
-                if (!isset($row['eventId']) and current($row['connectionId']) != 'e0xQbdWbNjMCEZA=') {
-                    $matched_connections[0]['connectionId'][] = current($row['connectionId']);
-                }
-            }
-        }
-
         return array_map(
             function ($item) use ($data) {
                 return $this->_CI->aws_lib->postToConnection(
