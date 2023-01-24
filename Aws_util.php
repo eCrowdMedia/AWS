@@ -495,19 +495,16 @@ class Aws_util
         $result = $this->_CI->aws_lib->queryScan([
             'TableName' => $this->_config['event_tablename'],
             'ProjectionExpression' => 'connectionId, eventId',
+            'FilterExpression' => 'contains(events, :eventId)',
+            'ExpressionAttributeValues' => [
+                ':eventId' => ['S' => $uuid]
+            ],
         ]);
         if (!isset($result['items'])) {
             throw new Exception('No event DynamoDB found.');
         } elseif ($result['count'] == 0) {
             return;
         }
-
-        $matched_connections = array_filter(
-            $result['items'],
-            function ($item) use ($uuid) {
-                return current($item['eventId'] ?? []) == $uuid;
-            }
-        );
 
         return array_map(
             function ($item) use ($data) {
@@ -516,7 +513,7 @@ class Aws_util
                     $data
                 );
             },
-            $matched_connections
+            $result['items']
         );
     }
 
