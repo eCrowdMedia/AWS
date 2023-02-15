@@ -190,9 +190,14 @@ class Aws_lib
             if (empty($options['SourceFile']) && empty($options['Body'])) {
                 $options[is_file($source) ? 'SourceFile' : 'Body'] = $source;
             }
-            if (isset($options['SourceFile']) && empty($options['ContentType'])) {
-                $finfo = finfo_open(FILEINFO_MIME_TYPE);
-                $options['ContentType'] = finfo_file($finfo, $options['SourceFile']);
+            if (empty($options['ContentType'])) {
+                if (isset($options['SourceFile'])) {
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $options['ContentType'] = finfo_file($finfo, $options['SourceFile']);
+                } else {
+                    function_exists('get_mime_by_extension') or $this->_CI->load->helper('file');
+                    $options['ContentType'] = get_mime_by_extension($key);
+                }
             }
 
             return $this->get_client('S3')->putObject($options);
