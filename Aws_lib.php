@@ -911,10 +911,10 @@ class Aws_lib
             if (!$this->_valid_arn($params)) {
                 throw new Exception('Invalid parameter, only one of "PhoneNumber", "TargetArn", "TopicArn" should exist', 500);
             }
-            if (isset($params['PhoneNumber'])) {
-                if (!$this->_valid_E164($params['PhoneNumber'])) {
-                    throw new Exception('PhoneNumber should use E.164 format.', 500);
-                }
+            if (isset($params['PhoneNumber']) &&
+                !$this->_valid_E164($params['PhoneNumber'])
+            ) {
+                throw new Exception('PhoneNumber should use E.164 format.', 500);
             }
             if (isset($params['Subject']) &&
                 !$this->_valid_subject($params['Subject'])
