@@ -9,13 +9,14 @@
  *
  * @link        https://readmoo.com
  */
-use Aws\S3\Exception\S3Exception;
 use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
-use Aws\Sqs\Exception\SqsException;
 use Aws\DynamoDb\DynamoDbClient;
-use Aws\Batch\Exception\BatchException;
 use Aws\Batch\BatchClient;
+use Aws\S3\Exception\S3Exception;
+use Aws\Ses\Exception\SesException;
+use Aws\Sqs\Exception\SqsException;
+use Aws\Batch\Exception\BatchException;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -996,17 +997,18 @@ class Aws_lib
         try {
             $params = [
                 'Source' => $source,
-                'Destinations' => [
-                    'ToAddresses' => is_array($destinations) ?
-                        $destinations :
-                        array_map('trim', explode(',', $destinations)),
-                ],
+                'Destinations' => is_array($destinations) ?
+                    $destinations :
+                    array_map('trim', explode(',', $destinations)),
                 'RawMessage' => [
                     'Data' => $rawMessage,
                 ],
             ];
 
-            return $this->get_client('Ses')->sendRawEmail($params);
+            return $this->get_client(
+                'Ses',
+                ['region' => 'us-west-2']
+            )->sendRawEmail($params);
         } catch (SesException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
