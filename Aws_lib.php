@@ -991,6 +991,27 @@ class Aws_lib
         return $this->_client_pool[$name];
     }
 
+    public function sendRawEmail(string $source, $destinations, $rawMessage)
+    {
+        try {
+            $params = [
+                'Source' => $source,
+                'Destinations' => [
+                    'ToAddresses' => is_array($destinations) ?
+                        $destinations :
+                        array_map('trim', explode(',', $destinations)),
+                ],
+                'RawMessage' => [
+                    'Data' => $rawMessage,
+                ],
+            ];
+
+            return $this->get_client('Ses')->sendRawEmail($params);
+        } catch (SesException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
     private function _valid_endpoint($endpoint, $protocol)
     {
         switch ($protocol) {
