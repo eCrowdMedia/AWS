@@ -391,7 +391,7 @@ class Aws_lib
     /**
      * @method Model listDistributions(array $args = array()) {@command CloudFront ListDistributions}
      */
-    public function listDistributions(string $cname = false)
+    public function listDistributions($cname = false)
     {
         try {
             $distributions = $this->get_client('CloudFront')->listDistributions();
@@ -494,7 +494,7 @@ class Aws_lib
     /**
      * @method Model getQueueUrl(array $args = array()) {@command Sqs GetQueueUrl}
      */
-    public function getQueueUrl(string $queueName, string $queueOwnerAWSAccountId = false)
+    public function getQueueUrl(string $queueName, $queueOwnerAWSAccountId = false)
     {
         try {
             $params = [
@@ -514,7 +514,7 @@ class Aws_lib
     /**
      * @method Model listQueues(array $args = array()) {@command Sqs ListQueues}
      */
-    public function listQueues(string $queueNamePrefix = false)
+    public function listQueues($queueNamePrefix = false)
     {
         $params = [];
         if (!empty($queueNamePrefix)) {
