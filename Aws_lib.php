@@ -992,18 +992,18 @@ class Aws_lib
         return $this->_client_pool[$name];
     }
 
-    public function sendRawEmail(string $source, $destinations, $rawMessage)
+    public function sendRawEmail(string $rawMessage, string $source = null, $destinations = [])
     {
         try {
-            $params = [
-                'Source' => $source,
-                'Destinations' => is_array($destinations) ?
+            $params = ['RawMessage' => ['Data' => $rawMessage]];
+            if (!empty($source)) {
+                $params['Source'] = $source;
+            }
+            if (!empty($destinations)) {
+                $params['Destinations'] = is_array($destinations) ?
                     $destinations :
-                    array_map('trim', explode(',', $destinations)),
-                'RawMessage' => [
-                    'Data' => $rawMessage,
-                ],
-            ];
+                    explode(',', str_replace(' ', '', $destinations));
+            }
 
             return $this->get_client(
                 'Ses',
