@@ -689,15 +689,6 @@ class Aws_lib
         }
     }
 
-    public function batchGetItem(array $params = [])
-    {
-        try {
-            return $this->get_client('DynamoDb')->batchGetItem($params);
-        } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
-        }
-    }
-
     public function getIterator($type, array $params = [])
     {
         try {
