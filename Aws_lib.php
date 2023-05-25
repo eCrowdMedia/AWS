@@ -1025,41 +1025,26 @@ class Aws_lib
         }
     }
 
-    private function _valid_endpoint($endpoint, $protocol)
+    public function listTopics($next_token = null)
     {
-        switch ($protocol) {
-            case 'http':
-            case 'https':
-                if (strpos($endpoint, $protocol . '://') !== 0) {
-                    throw new Exception($protocol, 500);
-                }
-                break;
-            case 'email':
-            case 'email-json':
-                $this->_CI->load->helper('email');
-                if (!valid_email($endpoint)) {
-                    throw new Exception('email', 500);
-                }
-                break;
-            case 'sms':
-                if (!$this->_valid_E164($endpoint)) {
-                    throw new Exception('E.164', 500);
-                }
-                break;
-            case 'sqs':
-            case 'lambda':
-                if (strpos($endpoint, 'arn:aws:' . $protocol) !== 0) {
-                    throw new Exception('ARN', 500);
-                }
-                break;
-            case 'application':
-                if (strpos($endpoint, 'arn:aws:sns') !== 0) {
-                    throw new Exception('ARN', 500);
-                }
-                break;
-            default:
-                throw new Exception('valid protocol: ' . $protocol, 500);
-                break;
+        try {
+            $params = empty($next_token) ? [] : ['NextToken' => $next_token];
+            return $this->_get_client('Sns')->listTopics($params);
+        } catch (Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function listSubscriptionsByTopic($topic_arn, $next_token = null)
+    {
+        try {
+            $params = [
+                'NextToken' => $next_token,
+                'TopicArn' => $topic_arn,
+            ];
+            return $this->_get_client('Sns')->listSubscriptionsByTopic($params);
+        } catch (Exception $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
 
@@ -1201,29 +1186,6 @@ class Aws_lib
             default:
                 throw new Exception('valid protocol: ' . $protocol, 500);
                 break;
-        }
-    }
-
-    public function listTopics($next_token = null)
-    {
-        try {
-            $params = empty($next_token) ? [] : ['NextToken' => $next_token];
-            return $this->_get_client('Sns')->listTopics($params);
-        } catch (Exception $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
-        }
-    }
-
-    public function listSubscriptionsByTopic($topic_arn, $next_token = null)
-    {
-        try {
-            $params = [
-                'NextToken' => $next_token,
-                'TopicArn' => $topic_arn,
-            ];
-            return $this->_get_client('Sns')->listSubscriptionsByTopic($params);
-        } catch (Exception $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
 }
