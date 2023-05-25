@@ -518,6 +518,7 @@ class Aws_util
             $result['items']
         );
     }
+
     public function list_topics($prefix = null)
     {
         static $next_token = null;
