@@ -9,13 +9,14 @@
  *
  * @link        https://readmoo.com
  */
-use Aws\S3\Exception\S3Exception;
 use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
-use Aws\Sqs\Exception\SqsException;
 use Aws\DynamoDb\DynamoDbClient;
-use Aws\Batch\Exception\BatchException;
 use Aws\Batch\BatchClient;
+use Aws\S3\Exception\S3Exception;
+use Aws\Ses\Exception\SesException;
+use Aws\Sqs\Exception\SqsException;
+use Aws\Batch\Exception\BatchException;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -28,7 +29,7 @@ class Aws_lib
     private $_config = null;
     private $_client_pool = [];
 
-    public function __construct($config = [])
+    public function __construct(array $config = [])
     {
         if (empty($config)) {
             $this->_CI = &get_instance();
@@ -44,7 +45,7 @@ class Aws_lib
         $this->_sdk = new Aws\Sdk($this->_config);
     }
 
-    public function isBucketDnsCompatible($bucket_name)
+    public function isBucketDnsCompatible(string $bucket_name)
     {
         try {
             return $this->get_client('S3')->isBucketDnsCompatible($bucket_name) ? true : false;
@@ -53,7 +54,7 @@ class Aws_lib
         }
     }
 
-    public function doesBucketExist($bucket_name)
+    public function doesBucketExist(string $bucket_name)
     {
         try {
             return $this->get_client('S3')->doesBucketExist($bucket_name) ? true : false;
@@ -65,7 +66,7 @@ class Aws_lib
     /**
      * @method Model createBucket(array $args = array()) {@command S3 CreateBucket}
      */
-    public function createBucket($bucket_name)
+    public function createBucket(string $bucket_name)
     {
         if (!$this->isBucketDnsCompatible($bucket_name)) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
@@ -88,7 +89,7 @@ class Aws_lib
     /**
      * @method Model headBucket(array $args = array()) {@command S3 HeadBucket}
      */
-    public function headBucket($bucket_name)
+    public function headBucket(string $bucket_name)
     {
         try {
             return $this->get_client('S3')->headBucket([
@@ -102,7 +103,7 @@ class Aws_lib
     /**
      * @method Model headObject(array $args = array()) {@command S3 HeadObject}
      */
-    public function headObject($bucket_name, $key, array $args = [])
+    public function headObject(string $bucket_name, string $key, array $args = [])
     {
         try {
             $args['Bucket'] = $bucket_name;
@@ -117,7 +118,7 @@ class Aws_lib
     /**
      * @method Model putBucketPolicy(array $args = array()) {@command S3 PutBucketPolicy}
      */
-    public function putBucketPolicy($bucket_name)
+    public function putBucketPolicy(string $bucket_name)
     {
         if ($this->doesBucketExist($bucket_name)) {
             try {
@@ -138,7 +139,7 @@ class Aws_lib
     /**
      * @method Model deleteBucket(array $args = array()) {@command S3 DeleteBucket}
      */
-    public function deleteBucket($bucket_name)
+    public function deleteBucket(string $bucket_name)
     {
         try {
             $this->get_client('S3')->deleteBucket([
@@ -151,7 +152,7 @@ class Aws_lib
         }
     }
 
-    public function doesObjectExist($bucket_name, $key)
+    public function doesObjectExist(string $bucket_name, string $key)
     {
         try {
             return $this->get_client('S3')->doesObjectExist($bucket_name, $key) ? true : false;
@@ -163,7 +164,7 @@ class Aws_lib
     /**
      * @method Model getObject(array $args = [])
      */
-    public function getObject($bucket_name, $key, array $options = [])
+    public function getObject(string $bucket_name, string $key, array $options = [])
     {
         try {
             $options = [
@@ -180,7 +181,7 @@ class Aws_lib
     /**
      * @method Model putObject(array $args = array()) {@command S3 PutObject}
      */
-    public function putObject($bucket_name, $key, $source, array $options = [])
+    public function putObject(string $bucket_name, string $key, $source, array $options = [])
     {
         try {
             $options = [
@@ -209,7 +210,7 @@ class Aws_lib
     /**
      * @method Model copyObject(array $args = array()) {@command S3 CopyObject}
      */
-    public function copyObject($bucket_name, $key, $source, array $options = [])
+    public function copyObject(string $bucket_name, string $key, $source, array $options = [])
     {
         try {
             $options = [
@@ -227,7 +228,7 @@ class Aws_lib
     /**
      * @method Model deleteObject(array $args = array()) {@command S3 DeleteObject}
      */
-    public function deleteObject($bucket_name, $s3key)
+    public function deleteObject(string $bucket_name, string $s3key)
     {
         try {
             $this->get_client('S3')->deleteObject([
@@ -244,7 +245,7 @@ class Aws_lib
     /**
      * @method Model deleteObjects(array $args = array()) {@command S3 DeleteObjects}
      */
-    public function deleteObjects($bucket_name, $objects)
+    public function deleteObjects(string $bucket_name, $objects)
     {
         try {
             $this->get_client('S3')->deleteObjects([
@@ -263,7 +264,7 @@ class Aws_lib
     /**
      * @method int deleteMatchingObjects($bucket, $prefix = '', $regex = '', array $options = array()) {@command S3 DeleteMatchingObjects}
      */
-    public function deleteMatchingObjects($bucket_name, $prefix = '', $regex = '', array $options = [])
+    public function deleteMatchingObjects(string $bucket_name, string $prefix = '', string $regex = '', array $options = [])
     {
         try {
             return $this->get_client('S3')->deleteMatchingObjects($bucket_name, $prefix, $regex, $options);
@@ -280,7 +281,7 @@ class Aws_lib
     /**
      * @method Model listObjects(array $args = array()) {@command S3 ListObjects}
      */
-    public function listObjects($bucket_name, $prefix = '', $max_keys = 1000)
+    public function listObjects(string $bucket_name, string $prefix = '', int $max_keys = 1000)
     {
         try {
             return $this->get_client('S3')->listObjects([
@@ -303,7 +304,7 @@ class Aws_lib
      *                                      or a string that can be evaluated by strtotime
      * @return string
      */
-    public function createPresignedUrl($method, $bucket, $key, $expires, array $options = [])
+    public function createPresignedUrl(string $method, string $bucket, string $key, $expires, array $options = [])
     {
         try {
             $s3_client = $this->get_client('S3');
@@ -326,7 +327,7 @@ class Aws_lib
      *
      * @return [type] [description]
      */
-    public function createDistribution($bucket_name, $domain_name)
+    public function createDistribution(string $bucket_name, string $domain_name)
     {
         try {
             $return = $this->get_client('CloudFront')->createDistribution($this->_return_distribution_config_array($bucket_name, $domain_name, true));
@@ -337,7 +338,7 @@ class Aws_lib
         }
     }
 
-    public function disableDistribution($cfID)
+    public function disableDistribution(string $cfID)
     {
         try {
             $cf_client = $this->get_client('CloudFront');
@@ -359,7 +360,7 @@ class Aws_lib
         }
     }
 
-    public function deleteDistribution($cfID)
+    public function deleteDistribution(string $cfID)
     {
         try {
             $cf_client = $this->get_client('CloudFront');
@@ -379,7 +380,7 @@ class Aws_lib
     /**
      * @method Model getDistribution(array $args = array()) {@command CloudFront GetDistribution}
      */
-    public function getDistribution($cfID)
+    public function getDistribution(string $cfID)
     {
         try {
             return $this->get_client('CloudFront')->getDistribution(['Id' => $cfID]);
@@ -421,7 +422,7 @@ class Aws_lib
     /**
      * @method Model createInvalidation(array $args = array()) {@command CloudFront CreateInvalidation}
      */
-    public function createInvalidation($cfID, array $paths, $caller_reference = false)
+    public function createInvalidation(string $cfID, array $paths, $caller_reference = false)
     {
         try {
             if (empty($paths)) {
@@ -474,7 +475,7 @@ class Aws_lib
     /**
      * @method Model createQueue(array $args = array()) {@command Sqs CreateQueue}
      */
-    public function createQueue($queueName, $attributes = false)
+    public function createQueue(string $queueName, $attributes = false)
     {
         try {
             $params = [
@@ -494,7 +495,7 @@ class Aws_lib
     /**
      * @method Model getQueueUrl(array $args = array()) {@command Sqs GetQueueUrl}
      */
-    public function getQueueUrl($queueName, $queueOwnerAWSAccountId = false)
+    public function getQueueUrl(string $queueName, $queueOwnerAWSAccountId = false)
     {
         try {
             $params = [
@@ -532,7 +533,7 @@ class Aws_lib
     /**
      * @method Model sendMessage(array $args = array()) {@command Sqs SendMessage}
      */
-    public function sendMessage($queueUrl, $messageBody, $delaySeconds = false)
+    public function sendMessage(string $queueUrl, $messageBody, $delaySeconds = false)
     {
         try {
             $params = [
@@ -556,7 +557,7 @@ class Aws_lib
     /**
      * @method Model sendMessageBatch(array $args = array()) {@command Sqs SendMessageBatch}
      */
-    public function sendMessageBatch($queueUrl, $entries)
+    public function sendMessageBatch(string $queueUrl, $entries)
     {
         try {
             $params = [
@@ -573,7 +574,7 @@ class Aws_lib
     /**
      * @method Model receiveMessage(array $args = array()) {@command Sqs ReceiveMessage}
      */
-    public function receiveMessage($queueUrl, $maxNumberOfMessages = null, $visibilityTimeout = null, $waitTimeSeconds = null, $attributeNames = null)
+    public function receiveMessage(string $queueUrl, $maxNumberOfMessages = null, $visibilityTimeout = null, $waitTimeSeconds = null, $attributeNames = null)
     {
         try {
             $params = [
@@ -604,7 +605,7 @@ class Aws_lib
     /**
      * @method Model deleteMessage(array $args = array()) {@command Sqs DeleteMessage}
      */
-    public function deleteMessage($queueUrl, $receiptHandle)
+    public function deleteMessage(string $queueUrl, $receiptHandle)
     {
         try {
             return $this->get_client('Sqs')->deleteMessage([
@@ -619,7 +620,7 @@ class Aws_lib
     /**
      * @method Model changeMessageVisibility(array $args = array()) {@command Sqs ChangeMessageVisibility}
      */
-    public function changeMessageVisibility($queueUrl, $receiptHandle, $visibilityTimeout)
+    public function changeMessageVisibility(string $queueUrl, $receiptHandle, $visibilityTimeout)
     {
         try {
             return $this->get_client('Sqs')->changeMessageVisibility([
@@ -635,7 +636,7 @@ class Aws_lib
     /**
      * @method Model changeMessageVisibilityBatch(array $args = array()) {@command Sqs ChangeMessageVisibilityBatch}
      */
-    public function changeMessageVisibilityBatch($queueUrl, $entries)
+    public function changeMessageVisibilityBatch(string $queueUrl, $entries)
     {
         try {
             return $this->get_client('Sqs')->changeMessageVisibilityBatch([
@@ -650,7 +651,7 @@ class Aws_lib
     /**
      * @method Model deleteMessageBatch(array $args = array()) {@command Sqs DeleteMessageBatch}
      */
-    public function deleteMessageBatch($queueUrl, $entries)
+    public function deleteMessageBatch(string $queueUrl, $entries)
     {
         try {
             return $this->get_client('Sqs')->deleteMessageBatch([
@@ -689,7 +690,7 @@ class Aws_lib
         }
     }
 
-    public function getIterator($type, array $params = [])
+    public function getIterator(string $type, array $params = [])
     {
         try {
             return $this->get_client('DynamoDb')->getIterator($type, $params);
@@ -820,7 +821,7 @@ class Aws_lib
         return $result;
     }
 
-    public function cancel_job($jobId, $reason)
+    public function cancel_job(string $jobId, string $reason)
     {
         if (empty($jobId) || empty($reason)) {
             return false;
@@ -837,7 +838,7 @@ class Aws_lib
         ;
     }
 
-    public function terminate_job($jobId, $reason)
+    public function terminate_job(string $jobId, string $reason)
     {
         if (empty($jobId) || empty($reason)) {
             return false;
@@ -998,6 +999,28 @@ class Aws_lib
             $this->_client_pool[$name] = $this->_sdk->{'create' . $name}($options);
         }
         return $this->_client_pool[$name];
+    }
+
+    public function sendRawEmail(string $rawMessage, string $source = null, $destinations = [])
+    {
+        try {
+            $params = ['RawMessage' => ['Data' => $rawMessage]];
+            if (!empty($source)) {
+                $params['Source'] = $source;
+            }
+            if (!empty($destinations)) {
+                $params['Destinations'] = is_array($destinations) ?
+                    $destinations :
+                    explode(',', str_replace(' ', '', $destinations));
+            }
+
+            return $this->get_client(
+                'Ses',
+                ['region' => 'us-west-2']
+            )->sendRawEmail($params);
+        } catch (SesException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
     }
 
     private function _valid_endpoint($endpoint, $protocol)
