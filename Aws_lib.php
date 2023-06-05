@@ -690,6 +690,15 @@ class Aws_lib
         }
     }
 
+    public function deleteItem(array $params = [])
+    {
+        try {
+            return $this->get_client('DynamoDb')->deleteItem($params);
+        } catch (DynamoDbException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
     public function getIterator(string $type, array $params = [])
     {
         try {
