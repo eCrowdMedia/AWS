@@ -541,7 +541,7 @@ class Aws_lib
                 'MessageBody' => $messageBody,
             ];
             if ($delaySeconds !== false) {
-                $params[QueueAttribute::DELAY_SECONDS] = $delaySeconds;
+                $params['DelaySeconds'] = $delaySeconds;
             }
             $result = $this->get_client('Sqs')->sendMessage($params);
             if ($result->get('MD5OfMessageBody') == md5($messageBody)) {
