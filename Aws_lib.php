@@ -738,6 +738,29 @@ class Aws_lib
         }
     }
 
+    public function startQueryExecution(array $params = [])
+    {
+        try {
+            $result = $this->get_client('Athena')->startQueryExecution([
+                'QueryExecutionContext' => [
+                    'Catalog' => $params['Catalog'] ?? 'AwsDataCatalog',
+                    'Database' => $params['Database'],
+                ],
+                'QueryString' => $params['sql'], // REQUIRED
+                'ResultConfiguration' => [
+                    'EncryptionConfiguration' => [
+                        'EncryptionOption' => 'SSE_S3' // REQUIRED
+                    ],
+                    'OutputLocation' => $params['OutputLocation'],
+                ],
+            ]);
+
+            return $result;
+        } catch (AthenaException $e) {
+            return empty($this->_config['debug'])? false : $e->getMessage();
+        }
+    }
+
 
     /**
      * @method \Aws\Result postToConnection(array $args = [])
