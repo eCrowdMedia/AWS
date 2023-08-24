@@ -761,6 +761,11 @@ class Aws_lib
         }
     }
 
+    public function getQueryExecution($QueryExecutionId)
+    {
+        $result = $this->get_client('Athena')->getQueryExecution($QueryExecutionId);
+        return $result;
+    }
 
     /**
      * @method \Aws\Result postToConnection(array $args = [])
