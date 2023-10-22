@@ -11,8 +11,6 @@
  */
 use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
-use Aws\DynamoDb\DynamoDbClient;
-use Aws\Batch\BatchClient;
 use Aws\S3\Exception\S3Exception;
 use Aws\Ses\Exception\SesException;
 use Aws\Sqs\Exception\SqsException;
@@ -659,6 +657,15 @@ class Aws_lib
                 'Entries' => $entries,
             ]);
         } catch (SqsException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function createTable(array $params = [])
+    {
+        try {
+            return $this->get_client('DynamoDb')->createTable($params);
+        } catch (DynamoDbException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
