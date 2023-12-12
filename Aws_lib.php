@@ -670,6 +670,15 @@ class Aws_lib
         }
     }
 
+    public function getItem(array $params = [])
+    {
+        try {
+            return $this->get_client('DynamoDb')->getItem($params);
+        } catch (DynamoDbException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
     public function putItem(array $params = [])
     {
         try {
@@ -716,6 +725,15 @@ class Aws_lib
     }
 
     public function queryBatchItem(array $params = [])
+    {
+        try {
+            return $this->get_client('DynamoDb')->batchGetItem($params);
+        } catch (DynamoDbException $e) {
+            return empty($this->_config['debug']) ? false : $e->getMessage();
+        }
+    }
+
+    public function putBatchItem(array $params = [])
     {
         try {
             return $this->get_client('DynamoDb')->batchGetItem($params);
