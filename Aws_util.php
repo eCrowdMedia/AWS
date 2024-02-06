@@ -291,6 +291,10 @@ class Aws_util
                 $this->_s3_key_epub($mode, $segments, $params);
                 break;
 
+            case 'epub_prefix':
+                $this->_s3_key_epub_prefix($segments, $params);
+                break;
+
             default:
                 $this->_CI->load->helper('print');
                 foreach ($this->_config['s3_key'] as $key => $value) {
@@ -636,6 +640,25 @@ class Aws_util
             return false;
         }
         return $command;
+    }
+
+    private function _s3_key_epub_prefix(array &$segments, array $params)
+    {
+        $segments[1] = 'ebook';
+
+        if (!isset($params['path'])) {
+            return;
+        }
+
+        if (preg_match('|^[et]/|', $params['path'])) {
+            $segments = [
+                sprintf(
+                    '%sepub.readmoo.%s',
+                    self::$_s3_protocol,
+                    ENVIRONMENT == 'production' ? 'com' : 'tw'
+                )
+            ];
+        }
     }
 
     private function _s3_key_ebook(array &$segments, array $params)
