@@ -661,58 +661,124 @@ class Aws_lib
         }
     }
 
-    public function createTable(array $params = [])
+    public function createTable(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
-        try {
-            return $this->get_client('DynamoDb')->createTable($params);
-        } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+        // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+            try {
+                return $this->get_client('DynamoDb')->createTable($params);
+            } catch (\Aws\Exception\CredentialsException $e) {
+                if (empty($sleep)
+                    or $retry-- <= 0
+                ) {
+                    break;
+                }
+                sleep($sleep);
+            } catch (DynamoDbException $e) {
+                return empty($this->_config['debug']) ? false : $e->getMessage();
+            }
         }
+        return false;
     }
 
-    public function getItem(array $params = [])
+    public function getItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
-        try {
-            return $this->get_client('DynamoDb')->getItem($params);
-        } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+        // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+            try {
+                return $this->get_client('DynamoDb')->getItem($params);
+            } catch (\Aws\Exception\CredentialsException $e) {
+                if (empty($sleep)
+                    or $retry-- <= 0
+                ) {
+                    break;
+                }
+                sleep($sleep);
+            } catch (DynamoDbException $e) {
+                return empty($this->_config['debug']) ? false : $e->getMessage();
+            }
         }
+        return false;
     }
 
-    public function putItem(array $params = [])
+    public function putItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
-        try {
-            return $this->get_client('DynamoDb')->putItem($params);
-        } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+        // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+            try {
+                return $this->get_client('DynamoDb')->putItem($params);
+            } catch (\Aws\Exception\CredentialsException $e) {
+                if (empty($sleep)
+                    or $retry-- <= 0
+                ) {
+                    break;
+                }
+                sleep($sleep);
+            } catch (DynamoDbException $e) {
+                return empty($this->_config['debug']) ? false : $e->getMessage();
+            }
         }
+        return false;
     }
 
-    public function queryItem(array $params = [])
+    public function queryItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
-        try {
-            return $this->get_client('DynamoDb')->query($params);
-        } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+        // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+            try {
+                return $this->get_client('DynamoDb')->query($params);
+            } catch (\Aws\Exception\CredentialsException $e) {
+                if (empty($sleep)
+                    or $retry-- <= 0
+                ) {
+                    break;
+                }
+                sleep($sleep);
+            } catch (DynamoDbException $e) {
+                return empty($this->_config['debug']) ? false : $e->getMessage();
+            }
         }
+        return false;
     }
 
-    public function updateItem(array $params = [])
+    public function updateItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
-        try {
-            return $this->get_client('DynamoDb')->updateItem($params);
-        } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+        // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+            try {
+                return $this->get_client('DynamoDb')->updateItem($params);
+            } catch (\Aws\Exception\CredentialsException $e) {
+                if (empty($sleep)
+                    or $retry-- <= 0
+                ) {
+                    break;
+                }
+                sleep($sleep);
+            } catch (DynamoDbException $e) {
+                return empty($this->_config['debug']) ? false : $e->getMessage();
+            }
         }
+        return false;
     }
 
-    public function deleteItem(array $params = [])
+    public function deleteItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
-        try {
-            return $this->get_client('DynamoDb')->deleteItem($params);
-        } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+        // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+            try {
+                return $this->get_client('DynamoDb')->deleteItem($params);
+            } catch (\Aws\Exception\CredentialsException $e) {
+                if (empty($sleep)
+                    or $retry-- <= 0
+                ) {
+                    break;
+                }
+                sleep($sleep);
+            } catch (DynamoDbException $e) {
+                return empty($this->_config['debug']) ? false : $e->getMessage();
+            }
         }
+        return false;
     }
 
     public function getIterator(string $type, array $params = [])
