@@ -293,6 +293,29 @@ class Aws_lib
     }
 
     /**
+     * @method Model listObjectsV2(array $args = array()) {@command S3 ListObjectsV2}
+     */
+    public function listObjectsV2(
+        string $bucket,
+        string $prefix = '',
+        int $max_keys = 1000
+    ): Generator {
+        $continuationToken = null;
+        do {
+            $result = $this->get_client('S3')->listObjects([
+                'Bucket' => $bucket,
+                'Prefix' => $prefix,
+                'MaxKeys' => $max_keys,
+                'ContinuationToken' => $continuationToken,
+            ]);
+            foreach ($result['Contents'] as $content) {
+                yield $content;
+            }
+            $continuationToken = $result['NextContinuationToken'] ?? null;
+        } while ($result['IsTruncated']);
+    }
+
+    /**
      * Create a pre-signed URL for a request
      *
      * @param string $method get, head, put, delete
@@ -802,7 +825,7 @@ class Aws_lib
     public function putBatchItem(array $params = [])
     {
         try {
-            return $this->get_client('DynamoDb')->batchGetItem($params);
+            return $this->get_client('DynamoDb')->BatchWriteItem($params);
         } catch (DynamoDbException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
