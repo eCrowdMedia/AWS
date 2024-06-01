@@ -302,7 +302,7 @@ class Aws_lib
     ): Generator {
         $continuationToken = null;
         do {
-            $result = $this->get_client('S3')->listObjects([
+            $result = $this->get_client('S3')->listObjectsV2([
                 'Bucket' => $bucket,
                 'Prefix' => $prefix,
                 'MaxKeys' => $max_keys,
