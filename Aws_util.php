@@ -300,7 +300,7 @@ class Aws_util
                 foreach ($this->_config['s3_key'] as $key => $value) {
                     if ($key == $mode or preg_match(sprintf('!%s!', $key), $mode)) {
                         (isset($value['validate']) && empty($value['validate'])) or
-                        array_walk($params, function ($var) {
+                        array_walk($params, function ($var): void {
                             if (empty($var)) {
                                 throw new Exception('Invalid args.', 1);
                             }
