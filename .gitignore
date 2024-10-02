@@ -1,0 +1,3 @@
+# Ingore common cruft
+.DS_STORE
+/vendor/
