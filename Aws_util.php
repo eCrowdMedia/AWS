@@ -449,7 +449,7 @@ class Aws_util
         class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
         $prefix = $this->_config['sns_topic_prefix'];
         return $this->_CI->aws_lib->publish([
-            'TopicArn' => (strpos($topic, $prefix) === 0 ? '' : $prefix) . $topic,
+            'TopicArn' => (str_starts_with($topic, $prefix) ? '' : $prefix) . $topic,
             'Subject' => $subject,
             'Message' => $message,
         ]);
@@ -462,7 +462,7 @@ class Aws_util
         return $this->_CI->aws_lib->subscribe(
             $endpoint,
             $protocol,
-            (strpos($topic, $prefix) === 0 ? '' : $prefix) . $topic
+            (str_starts_with($topic, $prefix) ? '' : $prefix) . $topic
         );
     }
 
@@ -526,7 +526,7 @@ class Aws_util
         static $next_token = null;
         $result = [];
         if (!empty($prefix) &&
-            strpos($prefix, $this->_config['sns_topic_prefix']) !== 0
+            !str_starts_with($prefix, $this->_config['sns_topic_prefix'])
         ) {
             $prefix = $this->_config['sns_topic_prefix'] . $prefix;
         }
@@ -541,8 +541,8 @@ class Aws_util
             } else {
                 empty($list['Topics']) or array_walk(
                     $list['Topics'],
-                    function($topic) use (&$result, $prefix) {
-                        if (strpos($topic['TopicArn'], $prefix) === 0) {
+                    function($topic) use (&$result, $prefix): void {
+                        if (str_starts_with($topic['TopicArn'], $prefix)) {
                             $result[] = $topic['TopicArn'];
                         }
                     }
@@ -557,7 +557,7 @@ class Aws_util
     {
         class_exists('Aws_lib') OR $this->_CI->load->library('aws/aws_lib');
         $prefix = $this->_config['sns_topic_prefix'];
-        $topic_arn = (strpos($topic, $prefix) === 0 ? '' : $prefix) . $topic;
+        $topic_arn = (str_starts_with($topic, $prefix) ? '' : $prefix) . $topic;
         if ($next_token === true) {
             $result = [];
             $next_token = null;
