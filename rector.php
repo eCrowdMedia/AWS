@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Rector\CodeQuality\Rector\Class_\CompleteDynamicPropertiesRector;
 use Rector\Config\RectorConfig;
 
 return RectorConfig::configure()
@@ -11,4 +12,7 @@ return RectorConfig::configure()
     ])
     // uncomment to reach your current PHP version
     ->withPhpSets(php83: true)
+    ->withRules([
+        CompleteDynamicPropertiesRector::class,
+    ])
     ->withTypeCoverageLevel(0);
