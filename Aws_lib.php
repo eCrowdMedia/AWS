@@ -568,7 +568,7 @@ class Aws_lib
             if ($result->get('MD5OfMessageBody') == md5($messageBody)) {
                 return $result->get('MessageId');
             } else {
-                return $this->debug ? 'MD5 of message not matched' : false;
+                return empty($this->_config['debug']) ? 'MD5 of message not matched' : false;
             }
         } catch (SqsException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();

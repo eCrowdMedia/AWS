@@ -15,6 +15,7 @@ class Aws_util
     private static $_priv_key = null;
     private $_CI = false;
     private $_config = false;
+    private $_tasks = [];
 
     public function __construct($config = [])
     {
