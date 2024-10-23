@@ -138,11 +138,11 @@ class Aws_util
                         }
                         break;*/
 
-                    case 'public':
+                    /*case 'public':
                         if ($value) {
                             $args[] = $use_awss3cli ? '--acl public-read' : '-P';
                         }
-                        break;
+                        break;*/
 
                     case 'force':
                         if ($value && ! $use_awss3cli) {
