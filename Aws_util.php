@@ -347,7 +347,11 @@ class Aws_util
             'Signature' => $signature,
             'Key-Pair-Id' => $this->get_config('cf_keypair_id'),
         ];
-        return $url . http_build_query($query, null, ini_get('arg_separator.output'), PHP_QUERY_RFC3986);
+        return $url . http_build_query(
+            data: $query,
+            arg_separator: ini_get('arg_separator.output'),
+            encoding_type: PHP_QUERY_RFC3986
+        );
     }
 
     public function set_signed_cookies(array $params)
