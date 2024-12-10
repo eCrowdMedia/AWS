@@ -1,0 +1,11 @@
+# Ignore common cruft
+.DS_STORE
+
+# Ignore IDE configurations
+.idea/
+
+# Ignore composer generated files
+vendor/
+
+# Ignore CodeIgniter cache and logs
+application/*
