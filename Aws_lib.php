@@ -11,10 +11,12 @@
  */
 use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
+use Aws\CloudFrontKeyValueStore\Exception\CloudFrontKeyValueStoreException;
 use Aws\S3\Exception\S3Exception;
 use Aws\Ses\Exception\SesException;
 use Aws\Sqs\Exception\SqsException;
 use Aws\Batch\Exception\BatchException;
+use Aws\Signature\SignatureV4;
 
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
@@ -491,6 +493,91 @@ class Aws_lib
      * @method ResourceIteratorInterface getListDistributionsIterator(array $args = array()) The input array uses the parameters of the ListDistributions operation
      * @method ResourceIteratorInterface getListInvalidationsIterator(array $args = array()) The input array uses the parameters of the ListInvalidations operation
      * @method ResourceIteratorInterface getListStreamingDistributionsIterator(array $args = array()) The input array uses the parameters of the ListStreamingDistributions operation
+     */
+
+    /*
+     * @method \Aws\Result describeKeyValueStore(array $args = [])
+     */
+    public function describeKeyValueStore(string $kvs): Aws\Result|bool|string
+    {
+        try {
+            $params = [
+                'KvsARN' => $kvs,
+            ];
+            $result = $this->get_client('CloudFrontKeyValueStore')->describeKeyValueStore($params);
+
+            return $result;
+        } catch (CloudFrontKeyValueStoreException $e) {
+            return match (true) {
+                $e->getStatusCode() == 404 => null,
+                empty($this->_config['debug']) => false,
+                default => $e->getMessage(),
+            };
+        }
+    }
+
+    /*
+     * @method \Aws\Result getKey(array $args = [])
+     */
+    public function getKey(string $key, string $kvs): ?string
+    {
+        try {
+            $params = [
+                'Key' => $key,
+                'KvsARN' => $kvs,
+            ];
+            $result = $this->get_client('CloudFrontKeyValueStore')->getKey($params);
+
+            return $result->get('Value');
+        } catch (CloudFrontKeyValueStoreException $e) {
+            return match (true) {
+                $e->getStatusCode() == 404 => null,
+                empty($this->_config['debug']) => false,
+                default => $e->getMessage(),
+            };
+        }
+    }
+
+    /*
+     * @method \Aws\Result putKey(array $args = [])
+     */
+    public function putKey(
+        string $ifMatch,
+        string $key,
+        string $kvs,
+        string $value
+    ): Aws\Result|bool|string {
+        try {
+            $params = [
+                'IfMatch' => $ifMatch,
+                'Key' => $key,
+                'KvsARN' => $kvs,
+                'Value' => $value,
+            ];
+            $result = $this->get_client('CloudFrontKeyValueStore')->putKey($params);
+
+            return $result;
+        } catch (CloudFrontKeyValueStoreException $e) {
+            return match (true) {
+                $e->getStatusCode() == 404 => false,
+                empty($this->_config['debug']) => false,
+                default => $e->getMessage(),
+            };
+        }
+    }
+
+    /**
+     * This client is used to interact with the **Amazon CloudFront KeyValueStore** service.
+     * @method \Aws\Result deleteKey(array $args = [])
+     * @method \GuzzleHttp\Promise\Promise deleteKeyAsync(array $args = [])
+     * @method \GuzzleHttp\Promise\Promise describeKeyValueStoreAsync(array $args = [])
+     * @method \Aws\Result getKey(array $args = [])
+     * @method \GuzzleHttp\Promise\Promise getKeyAsync(array $args = [])
+     * @method \Aws\Result listKeys(array $args = [])
+     * @method \GuzzleHttp\Promise\Promise listKeysAsync(array $args = [])
+     * @method \GuzzleHttp\Promise\Promise putKeyAsync(array $args = [])
+     * @method \Aws\Result updateKeys(array $args = [])
+     * @method \GuzzleHttp\Promise\Promise updateKeysAsync(array $args = [])
      */
 
     /**
@@ -1142,6 +1229,13 @@ class Aws_lib
     public function get_client($name, $options = null)
     {
         if (!isset($this->_client_pool[$name])) {
+            if (in_array($name, ['CloudFrontKeyValueStore'])) {
+                $options['signature'] = new SignatureV4(
+                    service: strtolower($name),
+                    region: $this->_config['region'],
+                    options: ['use_v4a' => true]
+                );
+            }
             $this->_client_pool[$name] = $this->_sdk->{'create' . $name}($options);
         }
         return $this->_client_pool[$name];
