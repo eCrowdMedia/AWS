@@ -542,9 +542,9 @@ class Aws_lib
      * @method \Aws\Result putKey(array $args = [])
      */
     public function putKey(
+        string $kvs,
         string $ifMatch,
         string $key,
-        string $kvs,
         string $value
     ): Aws\Result|bool|string {
         try {
@@ -591,10 +591,42 @@ class Aws_lib
         }
     }
 
+    /*
+     * @method \Aws\Result updateKeys(array $args = [])
+     */
+    public function updateKeys(
+        string $kvs,
+        string $ifMatch,
+        array $puts = [],
+        array $deletes = []
+    ): Aws\Result|bool|string {
+        try {
+            $params = [
+                'KvsARN' => $kvs,
+                'IfMatch' => $ifMatch,
+            ];
+            if (!empty($puts)) {
+                $params['Puts'] = $puts;
+            }
+            if (!empty($deletes)) {
+                $params['Deletes'] = $deletes;
+            }
+
+            $result = $this->get_client('CloudFrontKeyValueStore')->updateKeys($params);
+
+            return $result;
+        } catch (CloudFrontKeyValueStoreException $e) {
+            return match (true) {
+                $e->getStatusCode() == 404 => false,
+                empty($this->_config['debug']) => false,
+                default => $e->getMessage(),
+            };
+        }
+    }
+
     /**
      * This client is used to interact with the **Amazon CloudFront KeyValueStore** service.
      * @method \Aws\Result deleteKey(array $args = [])
-     * @method \Aws\Result updateKeys(array $args = [])
      */
 
     /**
