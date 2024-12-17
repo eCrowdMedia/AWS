@@ -573,14 +573,13 @@ class Aws_lib
         string $kvs,
         int $maxResults = 10
     ): Generator {
-        $nextToken = null;
+        $params = [
+            'KvsARN' => $kvs, // REQUIRED
+            'MaxResults' => $maxResults,
+        ];
         try {
             do {
-                $result = $this->get_client('CloudFrontKeyValueStore')->listKeys([
-                    'KvsARN' => $kvs, // REQUIRED
-                    'MaxResults' => $maxResults,
-                    'NextToken' => $nextToken,
-                ]);
+                $result = $this->get_client('CloudFrontKeyValueStore')->listKeys($params);
                 foreach ($result['Items'] as $item) {
                     yield $item;
                 }
