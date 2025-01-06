@@ -15,8 +15,9 @@ class Aws_util
     private static $_priv_key = null;
     private $_CI = false;
     private $_config = false;
+    private $_tasks = [];
 
-    public function __construct($config = array())
+    public function __construct($config = [])
     {
         $this->_CI =& get_instance();
         $this->_config = array_merge(
@@ -73,12 +74,12 @@ class Aws_util
         return $this;
     }
 
-    public function get_combined_cmd($tasks = array())
+    public function get_combined_cmd($tasks = [])
     {
         foreach ($tasks as $mode => $task) {
             $this->add_task($task);
         }
-        $cmds = array();
+        $cmds = [];
         foreach ($this->_tasks as $task) {
             if (isset($task['cmd'])) {
                 $cmd = $task['cmd'];
@@ -120,7 +121,7 @@ class Aws_util
                                 $mode = 'cp';
                             }
                         }
-                        if ($mode == 'put' && strpos($source, self::$_s3_protocol) === 0) {
+                        if ($mode == 'put' && str_starts_with($source, self::$_s3_protocol)) {
                             return false;
                         }
                         break;
@@ -137,11 +138,11 @@ class Aws_util
                         }
                         break;*/
 
-                    case 'public':
+                    /*case 'public':
                         if ($value) {
                             $args[] = $use_awss3cli ? '--acl public-read' : '-P';
                         }
-                        break;
+                        break;*/
 
                     case 'force':
                         if ($value && ! $use_awss3cli) {
@@ -239,7 +240,7 @@ class Aws_util
 
     public function s3_del($s3_key, $dry_run = false)
     {
-        if (empty($s3_key) or strpos($s3_key, self::$_s3_protocol) !== 0) {
+        if (empty($s3_key) or !str_starts_with($s3_key, self::$_s3_protocol)) {
             return false;
         }
         $this->_CI->load->add_package_path(config_item('common_package'));
@@ -300,7 +301,7 @@ class Aws_util
                 foreach ($this->_config['s3_key'] as $key => $value) {
                     if ($key == $mode or preg_match(sprintf('!%s!', $key), $mode)) {
                         (isset($value['validate']) && empty($value['validate'])) or
-                        array_walk($params, function ($var) {
+                        array_walk($params, function ($var): void {
                             if (empty($var)) {
                                 throw new Exception('Invalid args.', 1);
                             }
@@ -339,19 +340,23 @@ class Aws_util
     {
         $url = $params['url'] . '?';
         $params['url'] = str_replace('http://', 'http*://', $params['url']);
-        list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
+        [$use_custom_policy, $path, $secure, $policy] = $this->_presign_process($params);
         $signature = $this->_safe_base64_encode($this->_sign($policy));
         $query = [
             'Expires' => $params['less_than'],
             'Signature' => $signature,
             'Key-Pair-Id' => $this->get_config('cf_keypair_id'),
         ];
-        return $url . http_build_query($query, null, ini_get('arg_separator.output'), PHP_QUERY_RFC3986);
+        return $url . http_build_query(
+            data: $query,
+            arg_separator: ini_get('arg_separator.output'),
+            encoding_type: PHP_QUERY_RFC3986
+        );
     }
 
     public function set_signed_cookies(array $params)
     {
-        list($use_custom_policy, $path, $secure, $policy) = $this->_presign_process($params);
+        [$use_custom_policy, $path, $secure, $policy] = $this->_presign_process($params);
 
         $use_custom_policy ?
             $this->_set_cookie(
@@ -393,7 +398,7 @@ class Aws_util
         if (isset($_SERVER['HTTP_IF_NONE_MATCH'])) {
             $args['IfNoneMatch'] = $_SERVER['HTTP_IF_NONE_MATCH'];
         }
-        if (strpos($filename, self::$_s3_protocol) === 0) {
+        if (str_starts_with($filename, self::$_s3_protocol)) {
             if (! preg_match('|^s3://([^/]+)/(.+)$|', $filename, $match)) {
                 return header('HTTP/1.0 404 Not Found');
             }
@@ -511,12 +516,10 @@ class Aws_util
         }
 
         return array_map(
-            function ($item) use ($data) {
-                return $this->_CI->aws_lib->postToConnection(
-                    current($item['connectionId']),
-                    $data
-                );
-            },
+            fn($item) => $this->_CI->aws_lib->postToConnection(
+                current($item['connectionId']),
+                $data
+            ),
             $result['items']
         );
     }
@@ -614,11 +617,7 @@ class Aws_util
         setcookie(
             'CloudFront-' . $name,
             $value,
-            0,
-            $path,
-            $_SERVER['DOMAIN'],
-            $secure,
-            true
+            ['expires' => 0, 'path' => $path, 'domain' => $_SERVER['DOMAIN'], 'secure' => $secure, 'httponly' => true]
         );
     }
 
@@ -695,7 +694,7 @@ class Aws_util
                 $segments[] = sprintf(
                     '%d_%d',
                     $file['version'],
-                    isset($setting['revision']) ? $setting['revision'] : 0
+                    $setting['revision'] ?? 0
                 );
             }
         }
@@ -739,7 +738,7 @@ class Aws_util
         $setting = is_string($file['setting']) ?
             json_decode($file['setting'], true) :
             $file['setting'];
-        $segments[] = $file['version'] . '_' . (isset($setting['revision']) ? $setting['revision'] : '0');
+        $segments[] = $file['version'] . '_' . ($setting['revision'] ?? '0');
         $segments[] = $mode;
     }
 

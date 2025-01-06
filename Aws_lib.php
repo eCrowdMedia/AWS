@@ -676,7 +676,7 @@ class Aws_lib
     {
         $params = [];
         if (!empty($queueNamePrefix)) {
-            $params['QueueNamePrefix'] = strpos($queueNamePrefix, ENVIRONMENT) === 0 ? $queueNamePrefix : (ENVIRONMENT.'_'.$queueNamePrefix);
+            $params['QueueNamePrefix'] = str_starts_with($queueNamePrefix, ENVIRONMENT) ? $queueNamePrefix : (ENVIRONMENT.'_'.$queueNamePrefix);
         }
         try {
             $result = $this->get_client('Sqs')->listQueues($params);
@@ -704,7 +704,7 @@ class Aws_lib
             if ($result->get('MD5OfMessageBody') == md5($messageBody)) {
                 return $result->get('MessageId');
             } else {
-                return $this->debug ? 'MD5 of message not matched' : false;
+                return empty($this->_config['debug']) ? 'MD5 of message not matched' : false;
             }
         } catch (SqsException $e) {
             return empty($this->_config['debug']) ? false : $e->getMessage();
@@ -826,7 +826,7 @@ class Aws_lib
         foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
             try {
                 return $this->get_client('DynamoDb')->createTable($params);
-            } catch (\Aws\Exception\CredentialsException $e) {
+            } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
                     or $retry-- <= 0
                 ) {
@@ -846,7 +846,7 @@ class Aws_lib
         foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
             try {
                 return $this->get_client('DynamoDb')->getItem($params);
-            } catch (\Aws\Exception\CredentialsException $e) {
+            } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
                     or $retry-- <= 0
                 ) {
@@ -866,7 +866,7 @@ class Aws_lib
         foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
             try {
                 return $this->get_client('DynamoDb')->putItem($params);
-            } catch (\Aws\Exception\CredentialsException $e) {
+            } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
                     or $retry-- <= 0
                 ) {
@@ -886,7 +886,7 @@ class Aws_lib
         foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
             try {
                 return $this->get_client('DynamoDb')->query($params);
-            } catch (\Aws\Exception\CredentialsException $e) {
+            } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
                     or $retry-- <= 0
                 ) {
@@ -906,7 +906,7 @@ class Aws_lib
         foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
             try {
                 return $this->get_client('DynamoDb')->updateItem($params);
-            } catch (\Aws\Exception\CredentialsException $e) {
+            } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
                     or $retry-- <= 0
                 ) {
@@ -926,7 +926,7 @@ class Aws_lib
         foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
             try {
                 return $this->get_client('DynamoDb')->deleteItem($params);
-            } catch (\Aws\Exception\CredentialsException $e) {
+            } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
                     or $retry-- <= 0
                 ) {
@@ -1247,21 +1247,17 @@ class Aws_lib
     public function unsubscribe($subscription_arn)
     {
         try {
-        } catch (Exception $e) {
+        } catch (Exception) {
         }
     }
 
     public function get_ip_ranges($service)
     {
         try {
-            switch ($service) {
-                case 'CLOUDFRONT':
-                    $endpoint = 'http://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips';
-                    break;
-                default:
-                    throw new Exception('Unsupport AWS service: ' . $service, 400);
-                    break;
-            }
+            $endpoint = match ($service) {
+                'CLOUDFRONT' => 'http://d7uri8nf7uskq.cloudfront.net/tools/list-cloudfront-ips',
+                default => throw new Exception('Unsupport AWS service: ' . $service, 400),
+            };
             $client = new GuzzleHttp\Client();
             $response = $client->request('GET', $endpoint);
             $status_code = $response->getStatusCode();
@@ -1275,8 +1271,7 @@ class Aws_lib
                 $response_json['CLOUDFRONT_GLOBAL_IP_LIST'],
                 $response_json['CLOUDFRONT_REGIONAL_EDGE_IP_LIST']
             );
-        } catch (RequestException $e) {
-        } catch (Exception $e) {
+        } catch (RequestException|Exception) {
         }
     }
 
@@ -1322,7 +1317,7 @@ class Aws_lib
         switch ($protocol) {
             case 'http':
             case 'https':
-                if (strpos($endpoint, $protocol . '://') !== 0) {
+                if (!str_starts_with($endpoint, $protocol . '://')) {
                     throw new Exception($protocol, 500);
                 }
                 break;
@@ -1340,12 +1335,12 @@ class Aws_lib
                 break;
             case 'sqs':
             case 'lambda':
-                if (strpos($endpoint, 'arn:aws:' . $protocol) !== 0) {
+                if (!str_starts_with($endpoint, 'arn:aws:' . $protocol)) {
                     throw new Exception('ARN', 500);
                 }
                 break;
             case 'application':
-                if (strpos($endpoint, 'arn:aws:sns') !== 0) {
+                if (!str_starts_with($endpoint, 'arn:aws:sns')) {
                     throw new Exception('ARN', 500);
                 }
                 break;
