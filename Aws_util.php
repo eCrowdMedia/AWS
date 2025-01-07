@@ -76,7 +76,7 @@ class Aws_util
 
     public function get_combined_cmd($tasks = [])
     {
-        foreach ($tasks as $mode => $task) {
+        foreach ($tasks as $task) {
             $this->add_task($task);
         }
         $cmds = [];

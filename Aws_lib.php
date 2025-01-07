@@ -823,7 +823,7 @@ class Aws_lib
     public function createTable(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
-        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
             try {
                 return $this->get_client('DynamoDb')->createTable($params);
             } catch (\Aws\Exception\CredentialsException) {
@@ -843,7 +843,7 @@ class Aws_lib
     public function getItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
-        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
             try {
                 return $this->get_client('DynamoDb')->getItem($params);
             } catch (\Aws\Exception\CredentialsException) {
@@ -863,7 +863,7 @@ class Aws_lib
     public function putItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
-        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
             try {
                 return $this->get_client('DynamoDb')->putItem($params);
             } catch (\Aws\Exception\CredentialsException) {
@@ -883,7 +883,7 @@ class Aws_lib
     public function queryItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
-        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
             try {
                 return $this->get_client('DynamoDb')->query($params);
             } catch (\Aws\Exception\CredentialsException) {
@@ -903,7 +903,7 @@ class Aws_lib
     public function updateItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
-        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
             try {
                 return $this->get_client('DynamoDb')->updateItem($params);
             } catch (\Aws\Exception\CredentialsException) {
@@ -923,7 +923,7 @@ class Aws_lib
     public function deleteItem(array $params = [], bool|int $retry = false): bool|Aws\Result
     {
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
-        foreach ([1, 1, 2, 3, 5, 8, 0] as $index => $sleep) {
+        foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
             try {
                 return $this->get_client('DynamoDb')->deleteItem($params);
             } catch (\Aws\Exception\CredentialsException) {
