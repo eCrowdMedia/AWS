@@ -828,7 +828,10 @@ class Aws_lib
                 return $this->get_client('DynamoDb')->createTable($params);
             } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
-                    or $retry-- <= 0
+                    or match (gettype($retry)) {
+                        'boolean' => !$retry,
+                        default => $retry-- <= 0,
+                    }
                 ) {
                     break;
                 }
@@ -848,7 +851,10 @@ class Aws_lib
                 return $this->get_client('DynamoDb')->getItem($params);
             } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
-                    or $retry-- <= 0
+                    or match (gettype($retry)) {
+                        'boolean' => !$retry,
+                        default => $retry-- <= 0,
+                    }
                 ) {
                     break;
                 }
@@ -868,7 +874,10 @@ class Aws_lib
                 return $this->get_client('DynamoDb')->putItem($params);
             } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
-                    or $retry-- <= 0
+                    or match (gettype($retry)) {
+                        'boolean' => !$retry,
+                        default => $retry-- <= 0,
+                    }
                 ) {
                     break;
                 }
@@ -888,7 +897,10 @@ class Aws_lib
                 return $this->get_client('DynamoDb')->query($params);
             } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
-                    or $retry-- <= 0
+                    or match (gettype($retry)) {
+                        'boolean' => !$retry,
+                        default => $retry-- <= 0,
+                    }
                 ) {
                     break;
                 }
@@ -908,7 +920,10 @@ class Aws_lib
                 return $this->get_client('DynamoDb')->updateItem($params);
             } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
-                    or $retry-- <= 0
+                    or match (gettype($retry)) {
+                        'boolean' => !$retry,
+                        default => $retry-- <= 0,
+                    }
                 ) {
                     break;
                 }
@@ -928,7 +943,10 @@ class Aws_lib
                 return $this->get_client('DynamoDb')->deleteItem($params);
             } catch (\Aws\Exception\CredentialsException) {
                 if (empty($sleep)
-                    or $retry-- <= 0
+                    or match (gettype($retry)) {
+                        'boolean' => !$retry,
+                        default => $retry-- <= 0,
+                    }
                 ) {
                     break;
                 }
