@@ -706,7 +706,7 @@ class Aws_util
             return;
         }
 
-        if (preg_match('|^[et]/|', $params['path'])) {
+        if (preg_match('|^[eta]/|', $params['path'])) {
             $segments = [
                 sprintf(
                     '%sepub.readmoo.%s',
@@ -738,7 +738,7 @@ class Aws_util
                 json_decode($file['setting'], true) :
                 $file['setting'];
 
-            if (preg_match('|^[et]/|', $setting['path'])) {
+            if (preg_match('|^[eta]/|', $setting['path'])) {
                 $segments = [
                     sprintf(
                         '%sepub.readmoo.%s',
