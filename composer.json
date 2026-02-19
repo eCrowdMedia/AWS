@@ -20,7 +20,7 @@
 		"php": "^8.3",
 		"composer/installers": "^1.2",
 		"aws/aws-sdk-php":"^3.0.0",
-		"ps/image-optimizer": "^2.0.5",
+		"spatie/image-optimizer": "^1.8",
 		"ecrowdmedia/common": "^1.107.13"
 	},
     "require-dev": {
