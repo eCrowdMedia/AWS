@@ -1353,6 +1353,11 @@ class Aws_lib
         }
     }
 
+    public function setDebug(bool $debug)
+    {
+        $this->_config['debug'] = $debug;
+    }
+
     private function _return_bucket_policy($bucket_name = '')
     {
         return '{
