@@ -238,7 +238,21 @@ class Aws_util
         }
     }
 
-    public function s3_del($s3_key, $dry_run = false)
+    /**
+     * 刪除 S3 路徑。
+     *
+     * $recursive 預設 true（維持既有行為），適用「目錄前綴」——路徑須以 '/' 結尾。
+     * 要刪**單一物件**時必須傳 false：`aws s3 rm --recursive` 會把路徑當成目錄前綴，
+     * 對精確的物件 key（例如 s3://bucket/u/aa/bb/cc.docx）比對不到任何東西，
+     * 而且**沒有匹配時是 exit 0**，所以會靜默什麼都不刪、也不會回報錯誤。
+     * （s3cmd 的 `del -r` 同理。）
+     *
+     * @param  string $s3_key    s3:// 開頭的完整路徑
+     * @param  bool   $dry_run   true 只回傳指令字串、不執行（供呼叫端組批次任務用）
+     * @param  bool   $recursive false = 精確刪除單一物件；true = 遞迴刪除目錄前綴
+     * @return string|array|false
+     */
+    public function s3_del($s3_key, $dry_run = false, $recursive = true)
     {
         if (empty($s3_key) or !str_starts_with($s3_key, self::$_s3_protocol)) {
             return false;
@@ -247,8 +261,8 @@ class Aws_util
         $this->_CI->load->library('process_lib');
         $this->_CI->load->remove_package_path(config_item('common_package'));
         $cmd = isset($this->_config['eb_aws_s3']) ?
-            ($this->_config['eb_aws_s3'] . ' rm --recursive ') :
-            ($this->_config['cmd_s3cmd'] . ' del -r ');
+            ($this->_config['eb_aws_s3'] . ' rm' . ($recursive ? ' --recursive ' : ' ')) :
+            ($this->_config['cmd_s3cmd'] . ' del' . ($recursive ? ' -r ' : ' '));
         $cmd .= $s3_key;
         return $dry_run ? $cmd : $this->_CI->process_lib->execute($cmd);
     }
