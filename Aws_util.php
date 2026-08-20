@@ -618,7 +618,27 @@ class Aws_util
             $match[3];
         $secure = $match[1] != 'http';
         if (empty($params['less_than'])) {
-            $params['less_than'] = time() + config_item('sess_expiration');
+            // CloudFront signed cookie / URL 的預設有效期。
+            //
+            // 原本直接沿用 `sess_expiration`（登入 session 期限，Galao 各 app 為 30 天），
+            // 把「登入多久」與「書檔授權多久」耦合在一起，造成兩個問題：
+            //   1. 簽章金鑰若外洩，可利用窗口長達 30 天；
+            //   2. 輪替簽章金鑰時，必須等 30 天舊 cookie 全部過期才能安全移除舊公鑰。
+            //
+            // 改為優先讀獨立設定 `cf_signed_cookie_ttl`（秒）。未設定時 fallback 回
+            // `sess_expiration`，維持既有行為，呼叫端不需同步修改。
+            // 明確傳入 `less_than` 的呼叫端（如 signed URL 多為 +5 分鐘）不受影響。
+            //
+            // 注意：aws.php 是以 use_sections=true 載入（見 _load_config()），設定值
+            // 存在 sectioned 層，全域 config_item() 讀不到，必須用 get_config()。
+            // isset() 先擋，避免未設定時 get_config() 對不存在的 key 產生 warning。
+            $ttl = isset($this->_config['cf_signed_cookie_ttl'])
+                ? (int) $this->get_config('cf_signed_cookie_ttl')
+                : 0;
+            if ($ttl <= 0) {
+                $ttl = (int) config_item('sess_expiration');
+            }
+            $params['less_than'] = time() + $ttl;
         }
         return [
             $use_custom_policy,
