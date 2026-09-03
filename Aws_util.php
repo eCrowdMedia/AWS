@@ -250,9 +250,11 @@ class Aws_util
      * @param  string $s3_key    s3:// 開頭的完整路徑
      * @param  bool   $dry_run   true 只回傳指令字串、不執行（供呼叫端組批次任務用）
      * @param  bool   $recursive false = 精確刪除單一物件；true = 遞迴刪除目錄前綴
+     * @param  array  $exclude   遞迴刪除時要保留的 key pattern（相對於 $s3_key 前綴，
+     *                           對應 aws s3 rm 的 --exclude；只在 $recursive=true 時生效）
      * @return string|array|false
      */
-    public function s3_del($s3_key, $dry_run = false, $recursive = true)
+    public function s3_del($s3_key, $dry_run = false, $recursive = true, array $exclude = [])
     {
         if (empty($s3_key) or !str_starts_with($s3_key, self::$_s3_protocol)) {
             return false;
@@ -263,7 +265,15 @@ class Aws_util
         $cmd = isset($this->_config['eb_aws_s3']) ?
             ($this->_config['eb_aws_s3'] . ' rm' . ($recursive ? ' --recursive ' : ' ')) :
             ($this->_config['cmd_s3cmd'] . ' del' . ($recursive ? ' -r ' : ' '));
-        $cmd .= $s3_key;
+        // 統一以 escapeshellarg 包住 S3 URI（對合法 s3:// 路徑透明，兼作命令注入的縱深防禦）。
+        $cmd .= escapeshellarg($s3_key);
+        // $exclude：遞迴刪除時要保留的 key pattern（相對於 $s3_key 前綴），各自 escape；
+        // 只在遞迴刪除時附加（--exclude 對單一物件刪除無意義）。向下相容：預設 [] 時行為與舊版相同。
+        if ($recursive && !empty($exclude)) {
+            foreach ($exclude as $pattern) {
+                $cmd .= ' --exclude ' . escapeshellarg($pattern);
+            }
+        }
         return $dry_run ? $cmd : $this->_CI->process_lib->execute($cmd);
     }
 
