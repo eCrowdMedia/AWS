@@ -12,6 +12,7 @@
 use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
 use Aws\CloudFrontKeyValueStore\Exception\CloudFrontKeyValueStoreException;
+use Aws\DynamoDb\Exception\DynamoDbException;
 use Aws\S3\Exception\S3Exception;
 use Aws\Ses\Exception\SesException;
 use Aws\Sqs\Exception\SqsException;
@@ -587,6 +588,7 @@ class Aws_lib
             } while (!empty($params['NextToken']));
         } catch (DynamoDbException $e) {
             !kd($e);
+            $this->_log_dynamodb_error(__FUNCTION__, $e);
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
@@ -837,6 +839,7 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
         }
@@ -860,6 +863,7 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
         }
@@ -883,6 +887,7 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
         }
@@ -906,6 +911,7 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
         }
@@ -929,6 +935,7 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
         }
@@ -952,6 +959,7 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
         }
@@ -963,6 +971,7 @@ class Aws_lib
         try {
             return $this->get_client('DynamoDb')->getIterator($type, $params);
         } catch (DynamoDbException $e) {
+            $this->_log_dynamodb_error(__FUNCTION__, $e);
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
@@ -972,6 +981,7 @@ class Aws_lib
         try {
             return $this->get_client('DynamoDb')->batchGetItem($params);
         } catch (DynamoDbException $e) {
+            $this->_log_dynamodb_error(__FUNCTION__, $e);
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
@@ -981,6 +991,7 @@ class Aws_lib
         try {
             return $this->get_client('DynamoDb')->BatchWriteItem($params);
         } catch (DynamoDbException $e) {
+            $this->_log_dynamodb_error(__FUNCTION__, $e);
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
@@ -1002,6 +1013,7 @@ class Aws_lib
 
             return $result;
         } catch (DynamoDbException $e) {
+            $this->_log_dynamodb_error(__FUNCTION__, $e);
             return empty($this->_config['debug']) ? false : $e->getMessage();
         }
     }
@@ -1474,6 +1486,42 @@ class Aws_lib
             ++$count;
         }
         return $count === 1;
+    }
+
+    /**
+     * 記錄 DynamoDB 操作失敗。
+     *
+     * 背景：本檔案位於全域 namespace，過去未 import
+     * `Aws\DynamoDb\Exception\DynamoDbException`，11 處 `catch (DynamoDbException $e)`
+     * 全被 PHP 解析成不存在的 `\DynamoDbException`，因此從未成立——真正的
+     * DynamoDbException 一路上拋，各方法「失敗回 false」的契約從未實現，呼叫端的
+     * `=== false` 檢查形同死碼。補上 import 後這些 catch 生效，但原本 `return false`
+     * 不留任何痕跡、失敗會變成無聲，故一併補上 log。
+     *
+     * ConditionalCheckFailedException 屬於預期路徑（條件式寫入的正常結果），記 info；
+     * 其餘（ValidationException / AccessDenied / ProvisionedThroughputExceeded 等）記 error。
+     *
+     * @param string            $operation 呼叫來源方法名（__FUNCTION__）
+     * @param DynamoDbException $e
+     */
+    private function _log_dynamodb_error(string $operation, DynamoDbException $e): void
+    {
+        $code = method_exists($e, 'getAwsErrorCode') ? (string) $e->getAwsErrorCode() : '';
+        $is_expected = $code === 'ConditionalCheckFailedException';
+
+        if (!function_exists('log_message')) {
+            return;
+        }
+
+        log_message(
+            $is_expected ? 'info' : 'error',
+            sprintf(
+                'Aws_lib::%s DynamoDB %s: %s',
+                $operation,
+                $is_expected ? '條件不成立（預期）' : '失敗',
+                $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
+            )
+        );
     }
 }
 // END Aws_lib Class
