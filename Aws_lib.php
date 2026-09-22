@@ -1558,12 +1558,23 @@ class Aws_lib
      *
      * 型別刻意收 `\Aws\Exception\AwsException`（所有服務的例外共同父類，實測
      * DynamoDb/S3/Ses/Sqs/CloudFront/CloudFrontKeyValueStore/Batch 皆繼承之，
-     * 且都有 getAwsErrorCode()），而非 DynamoDbException——本檔另有約 37 處
-     * S3/Ses/Sqs/CloudFront/Batch 的 catch 同樣完全沒有儀表，將來要一併補 log 時
-     * 不必再改簽章。（本 PR 僅處理 DynamoDB 那 10 處，其餘服務的行為未變動。）
+     * 且都有 getAwsErrorCode()／isConnectionError()），而非 DynamoDbException——本檔
+     * 另有約 37 處其他服務的 catch 同樣完全沒有儀表，將來要一併補 log 時不必再改簽章。
+     * （本 PR 僅處理 DynamoDB 那 10 處，其餘服務的行為未變動。）
      *
-     * ConditionalCheckFailedException 屬於預期路徑（條件式寫入的正常結果），記 info；
-     * 其餘（ValidationException / AccessDenied / ProvisionedThroughputExceeded 等）記 error。
+     * 嚴重度分三類，避免真正的缺陷淹沒在例行噪音裡。
+     * ⚠️ 分類放在**訊息標籤**、而非 log level，原因是 CodeIgniter 的 Log 只認
+     * ERROR/DEBUG/INFO/ALL（`system/core/Log.php` 的 `$_levels`），**沒有 WARNING**；
+     * 且 Galao 各 app 的 `log_threshold = 1`（只寫 ERROR），info/debug/warning 一律
+     * 不落地。若把可重試錯誤記成 warning，等於完全不記——與本次修正的目的相反。
+     * 故：
+     *   expected   → `info`（ConditionalCheckFailedException；threshold 1 下被丟棄
+     *                ＝正是期望的行為，這是條件式寫入的正常結果、不該產生噪音）
+     *   transient  → `error` + 「暫時性失敗（可重試）」標籤（Throttling、
+     *                ProvisionedThroughputExceeded、5xx、連線錯誤）：實際落地、
+     *                可用標籤 grep 或建 metric filter 與真缺陷區分
+     *   defect     → `error` + 「失敗」標籤（ValidationException、AccessDenied、
+     *                ResourceNotFound 等，多為呼叫端寫錯或權限/設定問題）
      *
      * @param string       $operation 呼叫來源方法名（__FUNCTION__）
      * @param AwsException $e
@@ -1571,22 +1582,48 @@ class Aws_lib
     private function _log_aws_error(string $operation, AwsException $e): void
     {
         $code = (string) $e->getAwsErrorCode();
-        $is_expected = $code === 'ConditionalCheckFailedException';
 
-        // 本套件不保證跑在 CodeIgniter 內
-        if (!function_exists('log_message')) {
+        /** 可重試／暫時性錯誤碼（AWS SDK 預設也會自行重試這幾類） */
+        $transient = [
+            'ThrottlingException',
+            'ThrottledException',
+            'ProvisionedThroughputExceededException',
+            'RequestLimitExceeded',
+            'TooManyRequestsException',
+            'InternalServerError',
+            'InternalFailure',
+            'ServiceUnavailable',
+            'RequestTimeout',
+        ];
+
+        if ($code === 'ConditionalCheckFailedException') {
+            $level = 'info';
+            $label = '條件不成立（預期）';
+        } elseif (in_array($code, $transient, true) || $e->isConnectionError()) {
+            $level = 'error';
+            $label = '暫時性失敗（可重試）';
+        } else {
+            $level = 'error';
+            $label = '失敗';
+        }
+
+        $message = sprintf(
+            'Aws_lib::%s AWS %s: %s',
+            $operation,
+            $label,
+            $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
+        );
+
+        // 本套件不保證跑在 CodeIgniter 內（CLI 工具、測試 bootstrap、其他框架）——
+        // 而那正是「套件被獨立使用」的情境。若在此靜默返回，失敗會完全不留記錄，
+        // 與本次修正的目的（讓失敗可觀測）自相矛盾。故退回 error_log()。
+        if (function_exists('log_message')) {
+            log_message($level, $message);
+
             return;
         }
 
-        log_message(
-            $is_expected ? 'info' : 'error',
-            sprintf(
-                'Aws_lib::%s AWS %s: %s',
-                $operation,
-                $is_expected ? '條件不成立（預期）' : '失敗',
-                $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
-            )
-        );
+        error_log(strtoupper($level) . ' - ' . $message);
     }
 }
 // END Aws_lib Class
