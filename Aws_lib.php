@@ -839,6 +839,9 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                // 補上 use Aws\DynamoDb\Exception\DynamoDbException 之前，這個 catch 是死碼
+                //（被解析成不存在的 \DynamoDbException），例外會一路上拋而非回 false。
+                // 現已生效；原本 return false 不留痕跡，故補 log 讓呼叫端與運維可追。
                 $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
@@ -863,6 +866,9 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                // 補上 use Aws\DynamoDb\Exception\DynamoDbException 之前，這個 catch 是死碼
+                //（被解析成不存在的 \DynamoDbException），例外會一路上拋而非回 false。
+                // 現已生效；原本 return false 不留痕跡，故補 log 讓呼叫端與運維可追。
                 $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
@@ -887,6 +893,9 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                // 補上 use Aws\DynamoDb\Exception\DynamoDbException 之前，這個 catch 是死碼
+                //（被解析成不存在的 \DynamoDbException），例外會一路上拋而非回 false。
+                // 現已生效；原本 return false 不留痕跡，故補 log 讓呼叫端與運維可追。
                 $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
@@ -911,6 +920,9 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                // 補上 use Aws\DynamoDb\Exception\DynamoDbException 之前，這個 catch 是死碼
+                //（被解析成不存在的 \DynamoDbException），例外會一路上拋而非回 false。
+                // 現已生效；原本 return false 不留痕跡，故補 log 讓呼叫端與運維可追。
                 $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
@@ -935,6 +947,9 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                // 補上 use Aws\DynamoDb\Exception\DynamoDbException 之前，這個 catch 是死碼
+                //（被解析成不存在的 \DynamoDbException），例外會一路上拋而非回 false。
+                // 現已生效；原本 return false 不留痕跡，故補 log 讓呼叫端與運維可追。
                 $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
@@ -959,6 +974,9 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
+                // 補上 use Aws\DynamoDb\Exception\DynamoDbException 之前，這個 catch 是死碼
+                //（被解析成不存在的 \DynamoDbException），例外會一路上拋而非回 false。
+                // 現已生效；原本 return false 不留痕跡，故補 log 讓呼叫端與運維可追。
                 $this->_log_dynamodb_error(__FUNCTION__, $e);
                 return empty($this->_config['debug']) ? false : $e->getMessage();
             }
