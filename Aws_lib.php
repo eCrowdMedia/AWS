@@ -12,6 +12,8 @@
 use Aws\CloudFront\Enum\ViewerProtocolPolicy;
 use Aws\CloudFront\Exception\CloudFrontException;
 use Aws\CloudFrontKeyValueStore\Exception\CloudFrontKeyValueStoreException;
+use Aws\DynamoDb\Exception\DynamoDbException;
+use Aws\Exception\AwsException;
 use Aws\S3\Exception\S3Exception;
 use Aws\Ses\Exception\SesException;
 use Aws\Sqs\Exception\SqsException;
@@ -577,18 +579,24 @@ class Aws_lib
             'KvsARN' => $kvs, // REQUIRED
             'MaxResults' => $maxResults,
         ];
-        try {
-            do {
-                $result = $this->get_client('CloudFrontKeyValueStore')->listKeys($params);
-                foreach ($result['Items'] as $item) {
-                    yield $item;
-                }
-                $params['NextToken'] = $result['NextToken'];
-            } while (!empty($params['NextToken']));
-        } catch (DynamoDbException $e) {
-            !kd($e);
-            return empty($this->_config['debug']) ? false : $e->getMessage();
-        }
+        // ⚠️ 這裡刻意不 catch AWS 例外，讓它上拋。
+        //
+        // 原本有一個 `catch (DynamoDbException)`，但本方法呼叫的是 CloudFrontKeyValueStore
+        // （拋 CloudFrontKeyValueStoreException），與 DynamoDbException 是平行類別——
+        // 該 catch 即使補上 import 仍是死碼，只是額外帶了一個 `!kd($e)`（dump-and-die）地雷。
+        //
+        // 不改成 catch CloudFrontKeyValueStoreException 的理由：本方法宣告 `: Generator`，
+        // generator 內的 `return $value` 不會傳回給 foreach 的呼叫端，只會讓迭代靜默結束。
+        // 分頁中途失敗時呼叫端會拿到「不完整但看起來正常」的 key 集合，而呼叫端（Galao）
+        // 據此做刪除決策——靜默截斷比讓例外上拋危險得多。故維持例外上拋，
+        // 與本修正前的實際運行行為一致，由呼叫端決定如何處理。
+        do {
+            $result = $this->get_client('CloudFrontKeyValueStore')->listKeys($params);
+            foreach ($result['Items'] as $item) {
+                yield $item;
+            }
+            $params['NextToken'] = $result['NextToken'];
+        } while (!empty($params['NextToken']));
     }
 
     /*
@@ -837,7 +845,13 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
+                $this->_log_aws_error(__FUNCTION__, $e);
+                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+                return false;
             }
         }
         return false;
@@ -860,7 +874,13 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
+                $this->_log_aws_error(__FUNCTION__, $e);
+                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+                return false;
             }
         }
         return false;
@@ -883,7 +903,13 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
+                $this->_log_aws_error(__FUNCTION__, $e);
+                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+                return false;
             }
         }
         return false;
@@ -906,7 +932,13 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
+                $this->_log_aws_error(__FUNCTION__, $e);
+                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+                return false;
             }
         }
         return false;
@@ -929,7 +961,13 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
+                $this->_log_aws_error(__FUNCTION__, $e);
+                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+                return false;
             }
         }
         return false;
@@ -952,7 +990,13 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                return empty($this->_config['debug']) ? false : $e->getMessage();
+                $this->_log_aws_error(__FUNCTION__, $e);
+                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+                return false;
             }
         }
         return false;
@@ -963,7 +1007,13 @@ class Aws_lib
         try {
             return $this->get_client('DynamoDb')->getIterator($type, $params);
         } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $this->_log_aws_error(__FUNCTION__, $e);
+            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+            return false;
         }
     }
 
@@ -972,7 +1022,13 @@ class Aws_lib
         try {
             return $this->get_client('DynamoDb')->batchGetItem($params);
         } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $this->_log_aws_error(__FUNCTION__, $e);
+            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+            return false;
         }
     }
 
@@ -981,7 +1037,13 @@ class Aws_lib
         try {
             return $this->get_client('DynamoDb')->BatchWriteItem($params);
         } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $this->_log_aws_error(__FUNCTION__, $e);
+            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+            return false;
         }
     }
 
@@ -1002,7 +1064,13 @@ class Aws_lib
 
             return $result;
         } catch (DynamoDbException $e) {
-            return empty($this->_config['debug']) ? false : $e->getMessage();
+            $this->_log_aws_error(__FUNCTION__, $e);
+            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
+            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
+            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
+            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
+            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
+            return false;
         }
     }
 
@@ -1474,6 +1542,88 @@ class Aws_lib
             ++$count;
         }
         return $count === 1;
+    }
+
+    /**
+     * 記錄 AWS 操作失敗。
+     *
+     * 背景：本檔案位於全域 namespace，過去未 import
+     * `Aws\DynamoDb\Exception\DynamoDbException`，各 DynamoDB 方法的
+     * `catch (DynamoDbException $e)` 全被 PHP 解析成不存在的 `\DynamoDbException`，
+     * 因此從未成立——真正的 DynamoDbException 一路上拋，各方法「失敗回 false」的契約
+     * 從未實現，呼叫端的 `=== false` 檢查形同死碼。補上 import 後這些 catch 生效
+     * （共 10 處：createTable / getItem / putItem / queryItem / updateItem / deleteItem /
+     * getIterator / queryBatchItem / putBatchItem / queryScan），但原本 `return false`
+     * 不留任何痕跡、失敗會變成無聲，故一併補上 log。
+     *
+     * 型別刻意收 `\Aws\Exception\AwsException`（所有服務的例外共同父類，實測
+     * DynamoDb/S3/Ses/Sqs/CloudFront/CloudFrontKeyValueStore/Batch 皆繼承之，
+     * 且都有 getAwsErrorCode()／isConnectionError()），而非 DynamoDbException——本檔
+     * 另有約 37 處其他服務的 catch 同樣完全沒有儀表，將來要一併補 log 時不必再改簽章。
+     * （本 PR 僅處理 DynamoDB 那 10 處，其餘服務的行為未變動。）
+     *
+     * 嚴重度分三類，避免真正的缺陷淹沒在例行噪音裡。
+     * ⚠️ 分類放在**訊息標籤**、而非 log level，原因是 CodeIgniter 的 Log 只認
+     * ERROR/DEBUG/INFO/ALL（`system/core/Log.php` 的 `$_levels`），**沒有 WARNING**；
+     * 且 Galao 各 app 的 `log_threshold = 1`（只寫 ERROR），info/debug/warning 一律
+     * 不落地。若把可重試錯誤記成 warning，等於完全不記——與本次修正的目的相反。
+     * 故：
+     *   expected   → `info`（ConditionalCheckFailedException；threshold 1 下被丟棄
+     *                ＝正是期望的行為，這是條件式寫入的正常結果、不該產生噪音）
+     *   transient  → `error` + 「暫時性失敗（可重試）」標籤（Throttling、
+     *                ProvisionedThroughputExceeded、5xx、連線錯誤）：實際落地、
+     *                可用標籤 grep 或建 metric filter 與真缺陷區分
+     *   defect     → `error` + 「失敗」標籤（ValidationException、AccessDenied、
+     *                ResourceNotFound 等，多為呼叫端寫錯或權限/設定問題）
+     *
+     * @param string       $operation 呼叫來源方法名（__FUNCTION__）
+     * @param AwsException $e
+     */
+    private function _log_aws_error(string $operation, AwsException $e): void
+    {
+        $code = (string) $e->getAwsErrorCode();
+
+        /** 可重試／暫時性錯誤碼（AWS SDK 預設也會自行重試這幾類） */
+        $transient = [
+            'ThrottlingException',
+            'ThrottledException',
+            'ProvisionedThroughputExceededException',
+            'RequestLimitExceeded',
+            'TooManyRequestsException',
+            'InternalServerError',
+            'InternalFailure',
+            'ServiceUnavailable',
+            'RequestTimeout',
+        ];
+
+        if ($code === 'ConditionalCheckFailedException') {
+            $level = 'info';
+            $label = '條件不成立（預期）';
+        } elseif (in_array($code, $transient, true) || $e->isConnectionError()) {
+            $level = 'error';
+            $label = '暫時性失敗（可重試）';
+        } else {
+            $level = 'error';
+            $label = '失敗';
+        }
+
+        $message = sprintf(
+            'Aws_lib::%s AWS %s: %s',
+            $operation,
+            $label,
+            $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
+        );
+
+        // 本套件不保證跑在 CodeIgniter 內（CLI 工具、測試 bootstrap、其他框架）——
+        // 而那正是「套件被獨立使用」的情境。若在此靜默返回，失敗會完全不留記錄，
+        // 與本次修正的目的（讓失敗可觀測）自相矛盾。故退回 error_log()。
+        if (function_exists('log_message')) {
+            log_message($level, $message);
+
+            return;
+        }
+
+        error_log(strtoupper($level) . ' - ' . $message);
     }
 }
 // END Aws_lib Class
