@@ -533,6 +533,14 @@ class Aws_util
                 ':eventId' => ['S' => $uuid]
             ],
         ]);
+        // ⚠️ 先分辨「AWS 查詢失敗」與「查無資料」：queryScan 失敗時回 false
+        // （debug 模式回錯誤字串），此時 isset($result['items']) 同樣為 false，
+        // 會落進下面那條 throw 而被誤報成「No event DynamoDB found.」——把
+        // 基礎設施錯誤診斷成業務上的查無資料，排查時會往完全錯誤的方向找。
+        // 真正的錯誤原因已由 Aws_lib::_log_aws_error 記入 log。
+        if ($result === false || is_string($result)) {
+            throw new Exception('DynamoDB queryScan failed for event lookup: ' . $uuid);
+        }
         if (!isset($result['items'])) {
             throw new Exception('No event DynamoDB found.');
         } elseif ($result['count'] == 0) {
