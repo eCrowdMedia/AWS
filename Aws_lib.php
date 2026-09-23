@@ -876,10 +876,11 @@ class Aws_lib
 
         // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
         // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
-        throw AwsCredentialsUnavailable::afterRetries(
+        throw $this->_translate_credentials_error(
             __FUNCTION__,
-            $attempts,
-            $credentials_error
+            $credentials_error,
+            $params,
+            $attempts
         );
     }
 
@@ -917,10 +918,11 @@ class Aws_lib
 
         // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
         // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
-        throw AwsCredentialsUnavailable::afterRetries(
+        throw $this->_translate_credentials_error(
             __FUNCTION__,
-            $attempts,
-            $credentials_error
+            $credentials_error,
+            $params,
+            $attempts
         );
     }
 
@@ -958,10 +960,11 @@ class Aws_lib
 
         // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
         // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
-        throw AwsCredentialsUnavailable::afterRetries(
+        throw $this->_translate_credentials_error(
             __FUNCTION__,
-            $attempts,
-            $credentials_error
+            $credentials_error,
+            $params,
+            $attempts
         );
     }
 
@@ -999,10 +1002,11 @@ class Aws_lib
 
         // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
         // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
-        throw AwsCredentialsUnavailable::afterRetries(
+        throw $this->_translate_credentials_error(
             __FUNCTION__,
-            $attempts,
-            $credentials_error
+            $credentials_error,
+            $params,
+            $attempts
         );
     }
 
@@ -1040,10 +1044,11 @@ class Aws_lib
 
         // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
         // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
-        throw AwsCredentialsUnavailable::afterRetries(
+        throw $this->_translate_credentials_error(
             __FUNCTION__,
-            $attempts,
-            $credentials_error
+            $credentials_error,
+            $params,
+            $attempts
         );
     }
 
@@ -1081,10 +1086,11 @@ class Aws_lib
 
         // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
         // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
-        throw AwsCredentialsUnavailable::afterRetries(
+        throw $this->_translate_credentials_error(
             __FUNCTION__,
-            $attempts,
-            $credentials_error
+            $credentials_error,
+            $params,
+            $attempts
         );
     }
 
@@ -1103,17 +1109,28 @@ class Aws_lib
      * 本方法自己是 generator，所以對呼叫端而言仍是 lazy（不會把結果全部讀進記憶體），
      * 但 yield 迴圈落在 try 內，分頁中途的失敗就能被攔下來翻譯。
      *
+     * ⚠️ 副作用：本方法變成 generator function 之後，**連 `get_client()` 都延後到
+     * 第一次迭代才執行**。取得回傳值但從未迭代 ⇒ 完全不會發出請求、也不會有例外。
+     * 呼叫端若只是「取得 iterator 但不迭代」，不要期待在那一行拿到錯誤。
+     *
+     * ⚠️ 刻意 `yield $item`（不帶 key）：SDK 的 `flatten()` 本來就是無 key 產出
+     * （0..N），若改成 `yield $key => $item` 會把內層的 key 重新曝露出來，遇到
+     * 重複 key 的 iterable 時 `iterator_to_array()` 會靜默吃掉資料（實測 4 筆
+     * 產出只剩 2 筆）。不帶 key 則永遠是 0..N，不可能碰撞。
+     *
      * @return \Generator SDK 原本也是回傳 Generator（flatmap），型別相容
      */
     public function getIterator(string $type, array $params = []): \Generator
     {
         try {
-            foreach ($this->get_client('DynamoDb')->getIterator($type, $params) as $key => $item) {
-                yield $key => $item;
+            foreach ($this->get_client('DynamoDb')->getIterator($type, $params) as $item) {
+                yield $item;
             }
         } catch (DynamoDbException $e) {
             // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
             throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
@@ -1124,6 +1141,8 @@ class Aws_lib
         } catch (DynamoDbException $e) {
             // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
             throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
@@ -1134,6 +1153,8 @@ class Aws_lib
         } catch (DynamoDbException $e) {
             // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
             throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
@@ -1158,6 +1179,8 @@ class Aws_lib
             // ⚠️ 分頁到一半失敗時，已累積的 $result 會連同例外一起被丟棄。那是刻意的：
             // 呼叫端無法從「部分結果」分辨資料是否完整，靜默回傳半套比失敗更危險。
             throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
@@ -1658,24 +1681,34 @@ class Aws_lib
         $code = (string) $e->getAwsErrorCode();
         $category = AwsFailureCategory::of($e);
 
-        $message = sprintf(
-            'Aws_lib::%s AWS %s%s: %s',
-            $operation,
-            $category->label(),
-            $table === null ? '' : ' [table=' . $table . ']',
-            $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
+        $this->_write_aws_log(
+            $category->logLevel(),
+            sprintf(
+                'Aws_lib::%s AWS %s%s: %s',
+                $operation,
+                $category->label(),
+                $table === null ? '' : ' [table=' . $table . ']',
+                $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
+            )
         );
+    }
 
-        // 本套件不保證跑在 CodeIgniter 內（CLI 工具、測試 bootstrap、其他框架）——
-        // 而那正是「套件被獨立使用」的情境。若在此靜默返回，失敗會完全不留記錄，
-        // 與本次修正的目的（讓失敗可觀測）自相矛盾。故退回 error_log()。
+    /**
+     * 實際寫 log。
+     *
+     * 本套件不保證跑在 CodeIgniter 內（CLI 工具、測試 bootstrap、其他框架）——
+     * 而那正是「套件被獨立使用」的情境。若在此靜默返回，失敗會完全不留記錄，
+     * 與本次修正的目的（讓失敗可觀測）自相矛盾。故退回 error_log()。
+     */
+    private function _write_aws_log(string $level, string $message): void
+    {
         if (function_exists('log_message')) {
-            log_message($category->logLevel(), $message);
+            log_message($level, $message);
 
             return;
         }
 
-        error_log(strtoupper($category->logLevel()) . ' - ' . $message);
+        error_log(strtoupper($level) . ' - ' . $message);
     }
 
     /**
@@ -1712,20 +1745,67 @@ class Aws_lib
     }
 
     /**
+     * 把 CredentialsException 翻譯成本套件的型別，並確保留下 log。
+     *
+     * 兩條路都走這裡：沒有重試迴圈的四個方法（getIterator／queryBatchItem／
+     * putBatchItem／queryScan）用 $attempts = 1；六個帶重試迴圈的方法在迴圈
+     * 跑完後帶入實際嘗試次數。
+     *
+     * 統一走同一個入口是刻意的——1.40.0 之前憑證耗盡是唯一「拋了例外卻沒有任何
+     * library log」的路徑，若讓兩邊各自處理，很容易又漏掉一邊。
+     *
+     * @return AwsOperationException 由呼叫端 throw
+     */
+    private function _translate_credentials_error(
+        string $operation,
+        ?\Aws\Exception\CredentialsException $e,
+        array $params = [],
+        int $attempts = 1,
+    ): AwsOperationException {
+        $table = $this->_dynamodb_table_name($params);
+
+        // 憑證問題屬 exogenous、可重試，標籤與 AwsFailureCategory::Transient 一致。
+        $this->_write_aws_log(
+            'error',
+            sprintf(
+                'Aws_lib::%s AWS 暫時性失敗（可重試）%s: CredentialsException（已嘗試 %d 次）- %s',
+                $operation,
+                $table === null ? '' : ' [table=' . $table . ']',
+                $attempts,
+                $e?->getMessage() ?? 'n/a'
+            )
+        );
+
+        return AwsCredentialsUnavailable::afterRetries($operation, $attempts, $e, $table);
+    }
+
+    /**
      * 從 DynamoDB 參數取出表名。單筆操作是 TableName；批次操作（batchGetItem／
-     * BatchWriteItem）的表名是 RequestItems 的 key，可能多張，故全部列出。
+     * BatchWriteItem）的表名是 RequestItems 的 key，可能多張。
+     *
+     * 表名一律來自設定檔或常數，不是使用者輸入，但仍做兩件防護：
+     *   1. 去掉控制字元——換行會讓一行 log 被偽造成兩行
+     *   2. 截斷過長字串——批次操作若帶數十張表，會讓每一行 log 與每個例外訊息
+     *      都拖上幾百個字元
      */
     private function _dynamodb_table_name(array $params): ?string
     {
-        if (!empty($params['TableName']) && is_string($params['TableName'])) {
-            return $params['TableName'];
+        // 用 isset 而非 !empty：表名 '0' 是合法的，!empty('0') 為 false 會被誤判成沒有表名。
+        if (isset($params['TableName']) && is_string($params['TableName'])) {
+            $name = $params['TableName'];
+        } elseif (isset($params['RequestItems']) && is_array($params['RequestItems'])) {
+            $name = implode(',', array_keys($params['RequestItems']));
+        } else {
+            return null;
         }
 
-        if (!empty($params['RequestItems']) && is_array($params['RequestItems'])) {
-            return implode(',', array_keys($params['RequestItems']));
+        $name = preg_replace('/[\x00-\x1F\x7F]/', '', $name) ?? '';
+
+        if ($name === '') {
+            return null;
         }
 
-        return null;
+        return mb_strlen($name) > 120 ? mb_substr($name, 0, 117) . '...' : $name;
     }
 }
 // END Aws_lib Class

@@ -533,13 +533,15 @@ class Aws_util
                 ':eventId' => ['S' => $uuid]
             ],
         ]);
-        // 1.39.13 起 queryScan 失敗會拋 Ecrowdmedia\Aws\Exception\DynamoDbUnavailable
-        // 等型別（帶原始例外於 getPrevious()），不再回 false，所以這裡不需要、也不該
+        // 1.40.0 起 queryScan 失敗會拋 Ecrowdmedia\Aws\Exception 下的型別
+        // （帶原始例外於 getPrevious()），不再回 false，所以這裡不需要、也不該
         // 再自行分辨「查詢失敗」與「查無資料」——查詢失敗根本不會走到這一行。
-        // 下面的 throw 因此又回到它原本單純的語意：查得到資料結構但沒有這個 event。
-        if (!isset($result['items'])) {
-            throw new Exception('No event DynamoDB found.');
-        } elseif ($result['count'] == 0) {
+        //
+        // 原本這裡還有一段 `if (!isset($result['items'])) throw 'No event DynamoDB found.'`，
+        // 已移除：queryScan 宣告 `: array` 且開頭就把 $result 初始化成
+        // ['items' => [], 'count' => 0]，`isset($result['items'])` 永遠為 true
+        // （空陣列不是 null），那個分支不可達。真正表達「查無此 event」的是 count。
+        if ($result['count'] == 0) {
             return;
         }
 

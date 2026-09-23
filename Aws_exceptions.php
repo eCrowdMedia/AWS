@@ -104,11 +104,16 @@ enum AwsFailureCategory: string
     ];
 
     /**
-     * 可重試的 HTTP status，與 SDK 的 `RetryMiddleware::$retryStatusCodes` 一致。
+     * 可重試的 HTTP status。
+     *
+     * 500/502/503/504 與 SDK 的 `RetryMiddleware::$retryStatusCodes` 一致；
+     * 429 是我方補充——canonical 的 throttling status，SDK 主要靠 error code
+     * 認 throttling，但 gateway 直接回 429 而不帶 x-amzn-ErrorType 時就會漏接，
+     * 與 502/503 是同一個機制的洞。
      *
      * @var array<int, int>
      */
-    public const TRANSIENT_STATUS_CODES = [500, 502, 503, 504];
+    public const TRANSIENT_STATUS_CODES = [429, 500, 502, 503, 504];
 
     public static function of(AwsException $e): self
     {
@@ -190,7 +195,14 @@ abstract class AwsOperationException extends \RuntimeException implements AwsOpe
     /**
      * Named constructor：由 SDK 例外翻譯而來，原始例外保留在 getPrevious()。
      *
-     * 訊息格式與 Aws_lib 寫進 log 的那一行一致，便於把例外與 log 對照。
+     * ⚠️ 只能在具體子類上呼叫。在抽象基底上直接呼叫會是
+     * `Error: Cannot instantiate abstract class`——翻譯請一律走
+     * `Aws_lib::_translate_dynamodb_error()`，它的 match 會挑正確的子類。
+     *
+     * 訊息刻意標示服務名（static::SERVICE，例如「DynamoDB 暫時性失敗」），
+     * 而 `Aws_lib::_log_aws_error()` 寫的是服務無關的「AWS 暫時性失敗」——
+     * 後者要同時服務 S3／SES 等約 37 處尚未收攏的 catch，故兩邊的標籤
+     * 前綴不同，其餘（operation、table、error code、原訊息）一致。
      */
     public static function during(string $operation, AwsException $e, ?string $table = null): static
     {
@@ -259,11 +271,19 @@ final class DynamoDbConditionFailed extends AwsOperationException
 }
 
 /**
- * 重試後仍無法取得 AWS 憑證。
+ * 無法取得 AWS 憑證。
  *
- * 對應 Aws_lib 各 DynamoDB 方法的 Fibonacci 重試迴圈跑完仍是
- * CredentialsException 的情況（1.39.12 之前這裡是 `return false`）。
- * CredentialsException 並非 AwsException 的子類，故不走 during()。
+ * 兩種來源：
+ *   - 帶 Fibonacci 重試迴圈的六個方法，重試跑完仍是 CredentialsException
+ *     （1.39.12 之前這裡是 `return false`）
+ *   - 沒有重試迴圈的四個方法（getIterator／queryBatchItem／putBatchItem／
+ *     queryScan），單次嘗試即失敗。這四處在 1.40.0 之前會讓原始的
+ *     CredentialsException 未經翻譯逸出——既不是 AwsOperationFailed 也不帶
+ *     RetryableAwsFailure，導致「上層只判斷 instanceof RetryableAwsFailure」
+ *     的重試機制對這四個方法靜默失效。
+ *
+ * CredentialsException 並非 AwsException 的子類（直接 extends RuntimeException），
+ * 故不走 during()。
  */
 final class AwsCredentialsUnavailable extends AwsOperationException implements RetryableAwsFailure
 {
@@ -271,12 +291,14 @@ final class AwsCredentialsUnavailable extends AwsOperationException implements R
         string $operation,
         int $attempts,
         ?\Throwable $previous = null,
+        ?string $table = null,
     ): self {
         return new self(
             sprintf(
-                'Aws_lib::%s 無法取得 AWS 憑證（已嘗試 %d 次）: %s',
+                'Aws_lib::%s 無法取得 AWS 憑證（已嘗試 %d 次）%s: %s',
                 $operation,
                 $attempts,
+                $table === null ? '' : ' [table=' . $table . ']',
                 $previous?->getMessage() ?? 'CredentialsException'
             ),
             $operation,

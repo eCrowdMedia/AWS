@@ -1,0 +1,20 @@
+parameters:
+    level: 2
+    paths:
+        - Aws_lib.php
+        - Aws_util.php
+        - Aws_exceptions.php
+
+    # Aws_exceptions.php 由 Aws_lib.php 的 require_once 載入，不在任何 autoload
+    # 路徑上（本套件 type=codeigniter-library，安裝時整個目錄被複製到 CI 的
+    # libraries 下、不在 vendor/ 內）。不列進 scanFiles 的話 PHPStan 看不到
+    # 那些型別，會噴一堆 class.notFound，並連帶誤報 _translate_dynamodb_error()
+    # 的回傳型別無效與 match 未窮舉。
+    scanFiles:
+        - Aws_exceptions.php
+
+    # 本套件是 CodeIgniter 3 library，執行期依賴框架提供的全域函式與常數。
+    # 獨立分析時看不到它們，這些不是本套件的缺陷。
+    ignoreErrors:
+        - identifier: constant.notFound
+        - identifier: function.notFound
