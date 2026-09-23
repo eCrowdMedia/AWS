@@ -73,21 +73,42 @@ enum AwsFailureCategory: string
     case Defect = 'defect';
 
     /**
-     * 可重試／暫時性錯誤碼。AWS SDK 預設也會自行重試這幾類。
+     * 可重試／暫時性錯誤碼。
+     *
+     * 以 AWS SDK 自己的 `RetryMiddleware::$retryCodes` 為基準（vendor/aws/aws-sdk-php/
+     * src/RetryMiddleware.php），避免我方另外維護一份殘缺的清單——那正是本套件
+     * 要消除的問題。前 11 個與 SDK 完全一致，之後是我方補充。
      *
      * @var array<int, string>
      */
     public const TRANSIENT_CODES = [
+        // ↓ 與 SDK RetryMiddleware::$retryCodes 同步
+        'RequestLimitExceeded',
+        'Throttling',
         'ThrottlingException',
         'ThrottledException',
         'ProvisionedThroughputExceededException',
-        'RequestLimitExceeded',
+        'RequestThrottled',
+        'BandwidthLimitExceeded',
+        'RequestThrottledException',
         'TooManyRequestsException',
+        'IDPCommunicationError',
+        'EC2ThrottledException',
+        // ↓ 我方補充：SDK 表沒有但確實可重試的 5xx 類
         'InternalServerError',
         'InternalFailure',
         'ServiceUnavailable',
         'RequestTimeout',
+        // ↓ DynamoDB control-plane 並發限制，AWS 文件明確標示可重試
+        'LimitExceededException',
     ];
+
+    /**
+     * 可重試的 HTTP status，與 SDK 的 `RetryMiddleware::$retryStatusCodes` 一致。
+     *
+     * @var array<int, int>
+     */
+    public const TRANSIENT_STATUS_CODES = [500, 502, 503, 504];
 
     public static function of(AwsException $e): self
     {
@@ -101,6 +122,17 @@ enum AwsFailureCategory: string
             return self::Transient;
         }
 
+        // ⚠️ 不能只看 error code：gateway 層回的 502/503 常常沒有 x-amzn-ErrorType
+        // header，此時 getAwsErrorCode() 是 null → (string) null === '' → 會落進
+        // Defect，被當成「我們自己的 bug」而且不可重試。SDK 本身也是 code 與
+        // status 兩條都看（$retryCodes + $retryStatusCodes），這裡比照。
+        if (in_array((int) $e->getStatusCode(), self::TRANSIENT_STATUS_CODES, true)) {
+            return self::Transient;
+        }
+
+        // 已知限制：TransactionCanceledException 的可重試性要看 CancellationReasons
+        // 裡每一筆的 Code（TransactionConflict 可重試、ConditionalCheckFailed 不可），
+        // 本層不解析那個結構。需要區分的呼叫端請自行檢查 getPrevious()。
         return self::Defect;
     }
 
@@ -160,16 +192,17 @@ abstract class AwsOperationException extends \RuntimeException implements AwsOpe
      *
      * 訊息格式與 Aws_lib 寫進 log 的那一行一致，便於把例外與 log 對照。
      */
-    public static function during(string $operation, AwsException $e): static
+    public static function during(string $operation, AwsException $e, ?string $table = null): static
     {
         $code = (string) $e->getAwsErrorCode();
 
         return new static(
             sprintf(
-                'Aws_lib::%s %s %s: %s',
+                'Aws_lib::%s %s %s%s: %s',
                 $operation,
                 static::SERVICE,
                 AwsFailureCategory::of($e)->label(),
+                $table === null ? '' : ' [table=' . $table . ']',
                 $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
             ),
             $operation,

@@ -870,7 +870,7 @@ class Aws_lib
                 // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
                 // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
                 // 這種我們自己的 bug 永遠沒有人發現。
-                throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
 
@@ -911,7 +911,7 @@ class Aws_lib
                 // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
                 // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
                 // 這種我們自己的 bug 永遠沒有人發現。
-                throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
 
@@ -952,7 +952,7 @@ class Aws_lib
                 // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
                 // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
                 // 這種我們自己的 bug 永遠沒有人發現。
-                throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
 
@@ -993,7 +993,7 @@ class Aws_lib
                 // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
                 // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
                 // 這種我們自己的 bug 永遠沒有人發現。
-                throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
 
@@ -1034,7 +1034,7 @@ class Aws_lib
                 // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
                 // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
                 // 這種我們自己的 bug 永遠沒有人發現。
-                throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
 
@@ -1075,7 +1075,7 @@ class Aws_lib
                 // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
                 // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
                 // 這種我們自己的 bug 永遠沒有人發現。
-                throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
 
@@ -1088,37 +1088,56 @@ class Aws_lib
         );
     }
 
-    public function getIterator(string $type, array $params = [])
+    /**
+     * DynamoDB 的 Query／Scan 迭代器。
+     *
+     * ⚠️ 這裡必須**代為迭代**，不能只把 `$client->getIterator()` 包在 try 裡。
+     * SDK 的 `AwsClientTrait::getIterator()` 在 paginator 同時具備 input_token 與
+     * output_token 時（DynamoDB Query／Scan 兩者皆有，已實測）會走
+     * `getPaginator($name, $args)->search($key)`，而 `ResultPaginator::search()`
+     * 回傳的是 `flatmap()` —— 一個 **lazy generator**。
+     * 也就是說 try 區塊內**完全沒有任何 AWS 請求發生**，真正的分頁請求是在呼叫端
+     * foreach 的時候才打出去，那時控制流早已離開 try，catch 形同死碼，原始的
+     * DynamoDbException 會未經翻譯、未經記錄、不帶 marker 就逸出。
+     *
+     * 本方法自己是 generator，所以對呼叫端而言仍是 lazy（不會把結果全部讀進記憶體），
+     * 但 yield 迴圈落在 try 內，分頁中途的失敗就能被攔下來翻譯。
+     *
+     * @return \Generator SDK 原本也是回傳 Generator（flatmap），型別相容
+     */
+    public function getIterator(string $type, array $params = []): \Generator
     {
         try {
-            return $this->get_client('DynamoDb')->getIterator($type, $params);
+            foreach ($this->get_client('DynamoDb')->getIterator($type, $params) as $key => $item) {
+                yield $key => $item;
+            }
         } catch (DynamoDbException $e) {
             // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
-            throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
         }
     }
 
-    public function queryBatchItem(array $params = [])
+    public function queryBatchItem(array $params = []): Aws\Result
     {
         try {
             return $this->get_client('DynamoDb')->batchGetItem($params);
         } catch (DynamoDbException $e) {
             // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
-            throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
         }
     }
 
-    public function putBatchItem(array $params = [])
+    public function putBatchItem(array $params = []): Aws\Result
     {
         try {
             return $this->get_client('DynamoDb')->BatchWriteItem($params);
         } catch (DynamoDbException $e) {
             // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
-            throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
         }
     }
 
-    public function queryScan(array $params = [])
+    public function queryScan(array $params = []): array
     {
         $result = [
             'items' => [],
@@ -1136,7 +1155,9 @@ class Aws_lib
             return $result;
         } catch (DynamoDbException $e) {
             // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
-            throw $this->_translate_dynamodb_error(__FUNCTION__, $e);
+            // ⚠️ 分頁到一半失敗時，已累積的 $result 會連同例外一起被丟棄。那是刻意的：
+            // 呼叫端無法從「部分結果」分辨資料是否完整，靜默回傳半套比失敗更危險。
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
         }
     }
 
@@ -1628,18 +1649,20 @@ class Aws_lib
      * 且 Galao 各 app 的 `log_threshold = 1`（只寫 ERROR），info/debug/warning 一律
      * 不落地。若把可重試錯誤記成 warning，等於完全不記。詳見 AwsFailureCategory。
      *
-     * @param string       $operation 呼叫來源方法名（__FUNCTION__）
+     * @param string      $operation 呼叫來源方法名（__FUNCTION__）
      * @param AwsException $e
+     * @param string|null $table    DynamoDB 表名（若可得），補進訊息便於排查
      */
-    private function _log_aws_error(string $operation, AwsException $e): void
+    private function _log_aws_error(string $operation, AwsException $e, ?string $table = null): void
     {
         $code = (string) $e->getAwsErrorCode();
         $category = AwsFailureCategory::of($e);
 
         $message = sprintf(
-            'Aws_lib::%s AWS %s: %s',
+            'Aws_lib::%s AWS %s%s: %s',
             $operation,
             $category->label(),
+            $table === null ? '' : ' [table=' . $table . ']',
             $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
         );
 
@@ -1665,19 +1688,44 @@ class Aws_lib
      * 回傳（而非直接 throw）是為了讓呼叫點寫成 `throw $this->_translate_...()`，
      * 靜態分析才看得出該分支一定中斷流程。
      *
+     * @param array $params 原始 DynamoDB 參數，僅用來取出表名補進訊息——
+     *                      翻譯後的例外只帶 operation 名稱的話，線上排查時
+     *                      無法知道是哪張表出問題。不記其他欄位（可能含 PII）。
      * @return AwsOperationException 由呼叫端 throw
      */
-    private function _translate_dynamodb_error(string $operation, DynamoDbException $e): AwsOperationException
-    {
+    private function _translate_dynamodb_error(
+        string $operation,
+        DynamoDbException $e,
+        array $params = [],
+    ): AwsOperationException {
+        $table = $this->_dynamodb_table_name($params);
+
         // 分類與訊息標籤沿用 _log_aws_error 的同一份邏輯（AwsFailureCategory），
         // 避免 log 寫「暫時性失敗」卻翻譯成 DynamoDbRequestRejected 這種不一致。
-        $this->_log_aws_error($operation, $e);
+        $this->_log_aws_error($operation, $e, $table);
 
         return match (AwsFailureCategory::of($e)) {
-            AwsFailureCategory::Expected => DynamoDbConditionFailed::during($operation, $e),
-            AwsFailureCategory::Transient => DynamoDbUnavailable::during($operation, $e),
-            AwsFailureCategory::Defect => DynamoDbRequestRejected::during($operation, $e),
+            AwsFailureCategory::Expected => DynamoDbConditionFailed::during($operation, $e, $table),
+            AwsFailureCategory::Transient => DynamoDbUnavailable::during($operation, $e, $table),
+            AwsFailureCategory::Defect => DynamoDbRequestRejected::during($operation, $e, $table),
         };
+    }
+
+    /**
+     * 從 DynamoDB 參數取出表名。單筆操作是 TableName；批次操作（batchGetItem／
+     * BatchWriteItem）的表名是 RequestItems 的 key，可能多張，故全部列出。
+     */
+    private function _dynamodb_table_name(array $params): ?string
+    {
+        if (!empty($params['TableName']) && is_string($params['TableName'])) {
+            return $params['TableName'];
+        }
+
+        if (!empty($params['RequestItems']) && is_array($params['RequestItems'])) {
+            return implode(',', array_keys($params['RequestItems']));
+        }
+
+        return null;
     }
 }
 // END Aws_lib Class
