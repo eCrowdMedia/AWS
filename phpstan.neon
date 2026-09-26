@@ -1,0 +1,26 @@
+parameters:
+    level: 2
+    paths:
+        - Aws_lib.php
+        - Aws_util.php
+        - Aws_exceptions.php
+
+    # Aws_exceptions.php 由 Aws_lib.php 的 require_once 載入，不在任何 autoload
+    # 路徑上（本套件 type=codeigniter-library，安裝時整個目錄被複製到 CI 的
+    # libraries 下、不在 vendor/ 內）。不列進 scanFiles 的話 PHPStan 看不到
+    # 那些型別，會噴一堆 class.notFound，並連帶誤報 _translate_dynamodb_error()
+    # 的回傳型別無效與 match 未窮舉。
+    scanFiles:
+        - Aws_exceptions.php
+
+    # 本套件是 CodeIgniter 3 library，執行期依賴框架提供的全域函式與常數。
+    #
+    # ⚠️ 刻意用逐一列舉的 bootstrap 而非
+    # `ignoreErrors: [identifier: function.notFound]`——後者會讓任何拼錯的
+    # 全域函式靜默通過（log_message 打成 log_mesage 要到正式環境才 fatal）。
+    # bootstrap 只放行確實存在於 CI 的那幾個，其餘未知函式仍會被攔下。
+    #
+    # 用 bootstrapFiles 而非 stubFiles：bootstrap 會被實際執行，define() 出來的
+    # 常數與 function 宣告因此真的存在；stubFiles 不處理常數。
+    bootstrapFiles:
+        - phpstan-bootstrap.php
