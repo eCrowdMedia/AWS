@@ -533,17 +533,15 @@ class Aws_util
                 ':eventId' => ['S' => $uuid]
             ],
         ]);
-        // ⚠️ 先分辨「AWS 查詢失敗」與「查無資料」：queryScan 失敗時回 false
-        // （debug 模式回錯誤字串），此時 isset($result['items']) 同樣為 false，
-        // 會落進下面那條 throw 而被誤報成「No event DynamoDB found.」——把
-        // 基礎設施錯誤診斷成業務上的查無資料，排查時會往完全錯誤的方向找。
-        // 真正的錯誤原因已由 Aws_lib::_log_aws_error 記入 log。
-        if ($result === false || is_string($result)) {
-            throw new Exception('DynamoDB queryScan failed for event lookup: ' . $uuid);
-        }
-        if (!isset($result['items'])) {
-            throw new Exception('No event DynamoDB found.');
-        } elseif ($result['count'] == 0) {
+        // 1.40.0 起 queryScan 失敗會拋 Ecrowdmedia\Aws\Exception 下的型別
+        // （帶原始例外於 getPrevious()），不再回 false，所以這裡不需要、也不該
+        // 再自行分辨「查詢失敗」與「查無資料」——查詢失敗根本不會走到這一行。
+        //
+        // 原本這裡還有一段 `if (!isset($result['items'])) throw 'No event DynamoDB found.'`，
+        // 已移除：queryScan 宣告 `: array` 且開頭就把 $result 初始化成
+        // ['items' => [], 'count' => 0]，`isset($result['items'])` 永遠為 true
+        // （空陣列不是 null），那個分支不可達。真正表達「查無此 event」的是 count。
+        if ($result['count'] == 0) {
             return;
         }
 

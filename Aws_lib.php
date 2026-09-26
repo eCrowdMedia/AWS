@@ -23,6 +23,21 @@ use Aws\Signature\SignatureV4;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\RequestException;
 
+use Ecrowdmedia\Aws\Exception\AwsCredentialsUnavailable;
+use Ecrowdmedia\Aws\Exception\AwsFailureCategory;
+use Ecrowdmedia\Aws\Exception\AwsMessageFormat;
+use Ecrowdmedia\Aws\Exception\AwsOperationException;
+use Ecrowdmedia\Aws\Exception\DynamoDbConditionFailed;
+use Ecrowdmedia\Aws\Exception\DynamoDbRequestRejected;
+use Ecrowdmedia\Aws\Exception\DynamoDbUnavailable;
+
+// 本套件型別為 codeigniter-library，安裝時整個目錄被 composer/installers 複製到
+// CI 的 libraries 路徑下、**不在 vendor/ 內**，因此沒有 PSR-4 autoload 可用。
+// 上面那些例外型別必須在此明確載入，否則 catch 會靜默不匹配（PHP 對無法解析的
+// catch 型別不會報錯，只是永遠不匹配——這正是 1.39.12 之前 DynamoDbException
+// 那些 catch 全是死碼的原因）。
+require_once __DIR__ . '/Aws_exceptions.php';
+
 class Aws_lib
 {
     private $_CI = null;
@@ -828,13 +843,20 @@ class Aws_lib
         }
     }
 
-    public function createTable(array $params = [], bool|int $retry = false): bool|Aws\Result
+    public function createTable(array $params = [], bool|int $retry = false): Aws\Result
     {
+        $attempts = 0;
+        $credentials_error = null;
+
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
         foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
+            ++$attempts;
+
             try {
                 return $this->get_client('DynamoDb')->createTable($params);
-            } catch (\Aws\Exception\CredentialsException) {
+            } catch (\Aws\Exception\CredentialsException $e) {
+                $credentials_error = $e;
+
                 if (empty($sleep)
                     or match (gettype($retry)) {
                         'boolean' => !$retry,
@@ -845,25 +867,38 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                $this->_log_aws_error(__FUNCTION__, $e);
-                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-                return false;
+                // 在邊界翻譯成本套件的型別並上拋，不再回 false。
+                // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
+                // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
+                // 這種我們自己的 bug 永遠沒有人發現。
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
-        return false;
+
+        // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
+        // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
+        throw $this->_translate_credentials_error(
+            __FUNCTION__,
+            $credentials_error,
+            $params,
+            $attempts
+        );
     }
 
-    public function getItem(array $params = [], bool|int $retry = false): bool|Aws\Result
+    public function getItem(array $params = [], bool|int $retry = false): Aws\Result
     {
+        $attempts = 0;
+        $credentials_error = null;
+
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
         foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
+            ++$attempts;
+
             try {
                 return $this->get_client('DynamoDb')->getItem($params);
-            } catch (\Aws\Exception\CredentialsException) {
+            } catch (\Aws\Exception\CredentialsException $e) {
+                $credentials_error = $e;
+
                 if (empty($sleep)
                     or match (gettype($retry)) {
                         'boolean' => !$retry,
@@ -874,25 +909,38 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                $this->_log_aws_error(__FUNCTION__, $e);
-                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-                return false;
+                // 在邊界翻譯成本套件的型別並上拋，不再回 false。
+                // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
+                // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
+                // 這種我們自己的 bug 永遠沒有人發現。
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
-        return false;
+
+        // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
+        // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
+        throw $this->_translate_credentials_error(
+            __FUNCTION__,
+            $credentials_error,
+            $params,
+            $attempts
+        );
     }
 
-    public function putItem(array $params = [], bool|int $retry = false): bool|Aws\Result
+    public function putItem(array $params = [], bool|int $retry = false): Aws\Result
     {
+        $attempts = 0;
+        $credentials_error = null;
+
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
         foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
+            ++$attempts;
+
             try {
                 return $this->get_client('DynamoDb')->putItem($params);
-            } catch (\Aws\Exception\CredentialsException) {
+            } catch (\Aws\Exception\CredentialsException $e) {
+                $credentials_error = $e;
+
                 if (empty($sleep)
                     or match (gettype($retry)) {
                         'boolean' => !$retry,
@@ -903,25 +951,38 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                $this->_log_aws_error(__FUNCTION__, $e);
-                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-                return false;
+                // 在邊界翻譯成本套件的型別並上拋，不再回 false。
+                // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
+                // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
+                // 這種我們自己的 bug 永遠沒有人發現。
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
-        return false;
+
+        // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
+        // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
+        throw $this->_translate_credentials_error(
+            __FUNCTION__,
+            $credentials_error,
+            $params,
+            $attempts
+        );
     }
 
-    public function queryItem(array $params = [], bool|int $retry = false): bool|Aws\Result
+    public function queryItem(array $params = [], bool|int $retry = false): Aws\Result
     {
+        $attempts = 0;
+        $credentials_error = null;
+
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
         foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
+            ++$attempts;
+
             try {
                 return $this->get_client('DynamoDb')->query($params);
-            } catch (\Aws\Exception\CredentialsException) {
+            } catch (\Aws\Exception\CredentialsException $e) {
+                $credentials_error = $e;
+
                 if (empty($sleep)
                     or match (gettype($retry)) {
                         'boolean' => !$retry,
@@ -932,25 +993,38 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                $this->_log_aws_error(__FUNCTION__, $e);
-                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-                return false;
+                // 在邊界翻譯成本套件的型別並上拋，不再回 false。
+                // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
+                // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
+                // 這種我們自己的 bug 永遠沒有人發現。
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
-        return false;
+
+        // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
+        // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
+        throw $this->_translate_credentials_error(
+            __FUNCTION__,
+            $credentials_error,
+            $params,
+            $attempts
+        );
     }
 
-    public function updateItem(array $params = [], bool|int $retry = false): bool|Aws\Result
+    public function updateItem(array $params = [], bool|int $retry = false): Aws\Result
     {
+        $attempts = 0;
+        $credentials_error = null;
+
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
         foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
+            ++$attempts;
+
             try {
                 return $this->get_client('DynamoDb')->updateItem($params);
-            } catch (\Aws\Exception\CredentialsException) {
+            } catch (\Aws\Exception\CredentialsException $e) {
+                $credentials_error = $e;
+
                 if (empty($sleep)
                     or match (gettype($retry)) {
                         'boolean' => !$retry,
@@ -961,25 +1035,38 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                $this->_log_aws_error(__FUNCTION__, $e);
-                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-                return false;
+                // 在邊界翻譯成本套件的型別並上拋，不再回 false。
+                // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
+                // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
+                // 這種我們自己的 bug 永遠沒有人發現。
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
-        return false;
+
+        // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
+        // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
+        throw $this->_translate_credentials_error(
+            __FUNCTION__,
+            $credentials_error,
+            $params,
+            $attempts
+        );
     }
 
-    public function deleteItem(array $params = [], bool|int $retry = false): bool|Aws\Result
+    public function deleteItem(array $params = [], bool|int $retry = false): Aws\Result
     {
+        $attempts = 0;
+        $credentials_error = null;
+
         // 使用 Fibonacci sequence 當作延遲秒數，最長重試 6 次，總等待時間為 20 秒
         foreach ([1, 1, 2, 3, 5, 8, 0] as $sleep) {
+            ++$attempts;
+
             try {
                 return $this->get_client('DynamoDb')->deleteItem($params);
-            } catch (\Aws\Exception\CredentialsException) {
+            } catch (\Aws\Exception\CredentialsException $e) {
+                $credentials_error = $e;
+
                 if (empty($sleep)
                     or match (gettype($retry)) {
                         'boolean' => !$retry,
@@ -990,64 +1077,89 @@ class Aws_lib
                 }
                 sleep($sleep);
             } catch (DynamoDbException $e) {
-                $this->_log_aws_error(__FUNCTION__, $e);
-                // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-                // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-                // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-                // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-                // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-                return false;
+                // 在邊界翻譯成本套件的型別並上拋，不再回 false。
+                // 呼叫端要降級請明確 catch DynamoDbUnavailable／DynamoDbConditionFailed，
+                // 不要把所有失敗都當成「查無資料」——那會讓 ValidationException
+                // 這種我們自己的 bug 永遠沒有人發現。
+                throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
             }
         }
-        return false;
+
+        // 重試跑完仍拿不到憑證。1.39.12 之前這裡是 `return false`，與「查無資料」
+        // 無法區分；改為上拋並把最後一次的 CredentialsException 掛在 previous。
+        throw $this->_translate_credentials_error(
+            __FUNCTION__,
+            $credentials_error,
+            $params,
+            $attempts
+        );
     }
 
-    public function getIterator(string $type, array $params = [])
+    /**
+     * DynamoDB 的 Query／Scan 迭代器。
+     *
+     * ⚠️ 這裡必須**代為迭代**，不能只把 `$client->getIterator()` 包在 try 裡。
+     * SDK 的 `AwsClientTrait::getIterator()` 在 paginator 同時具備 input_token 與
+     * output_token 時（DynamoDB Query／Scan 兩者皆有，已實測）會走
+     * `getPaginator($name, $args)->search($key)`，而 `ResultPaginator::search()`
+     * 回傳的是 `flatmap()` —— 一個 **lazy generator**。
+     * 也就是說 try 區塊內**完全沒有任何 AWS 請求發生**，真正的分頁請求是在呼叫端
+     * foreach 的時候才打出去，那時控制流早已離開 try，catch 形同死碼，原始的
+     * DynamoDbException 會未經翻譯、未經記錄、不帶 marker 就逸出。
+     *
+     * 本方法自己是 generator，所以對呼叫端而言仍是 lazy（不會把結果全部讀進記憶體），
+     * 但 yield 迴圈落在 try 內，分頁中途的失敗就能被攔下來翻譯。
+     *
+     * ⚠️ 副作用：本方法變成 generator function 之後，**連 `get_client()` 都延後到
+     * 第一次迭代才執行**。取得回傳值但從未迭代 ⇒ 完全不會發出請求、也不會有例外。
+     * 呼叫端若只是「取得 iterator 但不迭代」，不要期待在那一行拿到錯誤。
+     *
+     * ⚠️ 刻意 `yield $item`（不帶 key）：SDK 的 `flatten()` 本來就是無 key 產出
+     * （0..N），若改成 `yield $key => $item` 會把內層的 key 重新曝露出來，遇到
+     * 重複 key 的 iterable 時 `iterator_to_array()` 會靜默吃掉資料（實測 4 筆
+     * 產出只剩 2 筆）。不帶 key 則永遠是 0..N，不可能碰撞。
+     *
+     * @return \Generator SDK 原本也是回傳 Generator（flatmap），型別相容
+     */
+    public function getIterator(string $type, array $params = []): \Generator
     {
         try {
-            return $this->get_client('DynamoDb')->getIterator($type, $params);
+            foreach ($this->get_client('DynamoDb')->getIterator($type, $params) as $item) {
+                yield $item;
+            }
         } catch (DynamoDbException $e) {
-            $this->_log_aws_error(__FUNCTION__, $e);
-            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-            return false;
+            // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
-    public function queryBatchItem(array $params = [])
+    public function queryBatchItem(array $params = []): Aws\Result
     {
         try {
             return $this->get_client('DynamoDb')->batchGetItem($params);
         } catch (DynamoDbException $e) {
-            $this->_log_aws_error(__FUNCTION__, $e);
-            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-            return false;
+            // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
-    public function putBatchItem(array $params = [])
+    public function putBatchItem(array $params = []): Aws\Result
     {
         try {
             return $this->get_client('DynamoDb')->BatchWriteItem($params);
         } catch (DynamoDbException $e) {
-            $this->_log_aws_error(__FUNCTION__, $e);
-            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-            return false;
+            // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
-    public function queryScan(array $params = [])
+    public function queryScan(array $params = []): array
     {
         $result = [
             'items' => [],
@@ -1064,13 +1176,12 @@ class Aws_lib
 
             return $result;
         } catch (DynamoDbException $e) {
-            $this->_log_aws_error(__FUNCTION__, $e);
-            // ⚠️ 一律回 false，不回 $e->getMessage()。本檔無 declare(strict_types=1)，
-            // 而 putItem/queryItem 等宣告 `: bool|Aws\Result`，回傳字串會被 PHP
-            // **強制轉型成 bool(true)**（已實測），呼叫端的 `=== false`／`!$r`
-            // 全部漏掉、失敗被讀成成功，且診斷訊息在轉型中被摧毀。
-            // 錯誤細節已由上一行的 _log_aws_error 完整記錄，無須靠回傳值帶出。
-            return false;
+            // 在邊界翻譯成本套件的型別並上拋，不再回 false。詳見 Aws_exceptions.php。
+            // ⚠️ 分頁到一半失敗時，已累積的 $result 會連同例外一起被丟棄。那是刻意的：
+            // 呼叫端無法從「部分結果」分辨資料是否完整，靜默回傳半套比失敗更危險。
+            throw $this->_translate_dynamodb_error(__FUNCTION__, $e, $params);
+        } catch (\Aws\Exception\CredentialsException $e) {
+            throw $this->_translate_credentials_error(__FUNCTION__, $e, $params);
         }
     }
 
@@ -1547,76 +1658,56 @@ class Aws_lib
     /**
      * 記錄 AWS 操作失敗。
      *
-     * 背景：本檔案位於全域 namespace，過去未 import
-     * `Aws\DynamoDb\Exception\DynamoDbException`，各 DynamoDB 方法的
-     * `catch (DynamoDbException $e)` 全被 PHP 解析成不存在的 `\DynamoDbException`，
-     * 因此從未成立——真正的 DynamoDbException 一路上拋，各方法「失敗回 false」的契約
-     * 從未實現，呼叫端的 `=== false` 檢查形同死碼。補上 import 後這些 catch 生效
-     * （共 10 處：createTable / getItem / putItem / queryItem / updateItem / deleteItem /
-     * getIterator / queryBatchItem / putBatchItem / queryScan），但原本 `return false`
-     * 不留任何痕跡、失敗會變成無聲，故一併補上 log。
-     *
-     * 型別刻意收 `\Aws\Exception\AwsException`（所有服務的例外共同父類，實測
-     * DynamoDb/S3/Ses/Sqs/CloudFront/CloudFrontKeyValueStore/Batch 皆繼承之，
+     * 與服務無關：型別刻意收 `\Aws\Exception\AwsException`（所有服務的例外共同父類，
+     * 實測 DynamoDb/S3/Ses/Sqs/CloudFront/CloudFrontKeyValueStore/Batch 皆繼承之，
      * 且都有 getAwsErrorCode()／isConnectionError()），而非 DynamoDbException——本檔
      * 另有約 37 處其他服務的 catch 同樣完全沒有儀表，將來要一併補 log 時不必再改簽章。
-     * （本 PR 僅處理 DynamoDB 那 10 處，其餘服務的行為未變動。）
+     * （1.40.0 仍只處理 DynamoDB 那 10 處，其餘服務的行為未變動。）
      *
-     * 嚴重度分三類，避免真正的缺陷淹沒在例行噪音裡。
-     * ⚠️ 分類放在**訊息標籤**、而非 log level，原因是 CodeIgniter 的 Log 只認
+     * 分類邏輯已抽到 AwsFailureCategory（Aws_exceptions.php），讓 log 標籤與
+     * _translate_dynamodb_error() 翻譯出來的例外型別共用同一份判斷，避免出現
+     * 「log 寫暫時性失敗、例外卻是 DynamoDbRequestRejected」這種不一致。
+     *
+     * ⚠️ 分類放在**訊息標籤**、而非只靠 log level，原因是 CodeIgniter 的 Log 只認
      * ERROR/DEBUG/INFO/ALL（`system/core/Log.php` 的 `$_levels`），**沒有 WARNING**；
      * 且 Galao 各 app 的 `log_threshold = 1`（只寫 ERROR），info/debug/warning 一律
-     * 不落地。若把可重試錯誤記成 warning，等於完全不記——與本次修正的目的相反。
-     * 故：
-     *   expected   → `info`（ConditionalCheckFailedException；threshold 1 下被丟棄
-     *                ＝正是期望的行為，這是條件式寫入的正常結果、不該產生噪音）
-     *   transient  → `error` + 「暫時性失敗（可重試）」標籤（Throttling、
-     *                ProvisionedThroughputExceeded、5xx、連線錯誤）：實際落地、
-     *                可用標籤 grep 或建 metric filter 與真缺陷區分
-     *   defect     → `error` + 「失敗」標籤（ValidationException、AccessDenied、
-     *                ResourceNotFound 等，多為呼叫端寫錯或權限/設定問題）
+     * 不落地。若把可重試錯誤記成 warning，等於完全不記。詳見 AwsFailureCategory。
      *
-     * @param string       $operation 呼叫來源方法名（__FUNCTION__）
+     * @param string      $operation 呼叫來源方法名（__FUNCTION__）
      * @param AwsException $e
+     * @param string|null $table    DynamoDB 表名（若可得），補進訊息便於排查
      */
-    private function _log_aws_error(string $operation, AwsException $e): void
-    {
+    private function _log_aws_error(
+        string $operation,
+        AwsException $e,
+        ?string $table = null,
+        ?AwsFailureCategory $category = null,
+    ): void {
         $code = (string) $e->getAwsErrorCode();
+        // 呼叫端已經算過分類時傳進來，避免對同一個例外重複算
+        $category ??= AwsFailureCategory::of($e);
 
-        /** 可重試／暫時性錯誤碼（AWS SDK 預設也會自行重試這幾類） */
-        $transient = [
-            'ThrottlingException',
-            'ThrottledException',
-            'ProvisionedThroughputExceededException',
-            'RequestLimitExceeded',
-            'TooManyRequestsException',
-            'InternalServerError',
-            'InternalFailure',
-            'ServiceUnavailable',
-            'RequestTimeout',
-        ];
-
-        if ($code === 'ConditionalCheckFailedException') {
-            $level = 'info';
-            $label = '條件不成立（預期）';
-        } elseif (in_array($code, $transient, true) || $e->isConnectionError()) {
-            $level = 'error';
-            $label = '暫時性失敗（可重試）';
-        } else {
-            $level = 'error';
-            $label = '失敗';
-        }
-
-        $message = sprintf(
-            'Aws_lib::%s AWS %s: %s',
-            $operation,
-            $label,
-            $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
+        $this->_write_aws_log(
+            $category->logLevel(),
+            sprintf(
+                'Aws_lib::%s AWS %s%s: %s',
+                $operation,
+                $category->label(),
+                AwsMessageFormat::tableSuffix($table),
+                $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
+            )
         );
+    }
 
-        // 本套件不保證跑在 CodeIgniter 內（CLI 工具、測試 bootstrap、其他框架）——
-        // 而那正是「套件被獨立使用」的情境。若在此靜默返回，失敗會完全不留記錄，
-        // 與本次修正的目的（讓失敗可觀測）自相矛盾。故退回 error_log()。
+    /**
+     * 實際寫 log。
+     *
+     * 本套件不保證跑在 CodeIgniter 內（CLI 工具、測試 bootstrap、其他框架）——
+     * 而那正是「套件被獨立使用」的情境。若在此靜默返回，失敗會完全不留記錄，
+     * 與本次修正的目的（讓失敗可觀測）自相矛盾。故退回 error_log()。
+     */
+    private function _write_aws_log(string $level, string $message): void
+    {
         if (function_exists('log_message')) {
             log_message($level, $message);
 
@@ -1624,6 +1715,107 @@ class Aws_lib
         }
 
         error_log(strtoupper($level) . ' - ' . $message);
+    }
+
+    /**
+     * 把 DynamoDB 的 SDK 例外翻譯成本套件定義的型別（exception translation）。
+     *
+     * 這裡是 anti-corruption layer 的邊界：對外只吐 Ecrowdmedia\Aws\Exception
+     * 下的少數幾種型別，原始的 DynamoDbException 保留在 getPrevious()，
+     * 呼叫端因此仍查得到 AWS error code、request id 與原訊息。
+     *
+     * 回傳（而非直接 throw）是為了讓呼叫點寫成 `throw $this->_translate_...()`，
+     * 靜態分析才看得出該分支一定中斷流程。
+     *
+     * @param array $params 原始 DynamoDB 參數，僅用來取出表名補進訊息——
+     *                      翻譯後的例外只帶 operation 名稱的話，線上排查時
+     *                      無法知道是哪張表出問題。不記其他欄位（可能含 PII）。
+     * @return AwsOperationException 由呼叫端 throw
+     */
+    private function _translate_dynamodb_error(
+        string $operation,
+        DynamoDbException $e,
+        array $params = [],
+    ): AwsOperationException {
+        $table = $this->_dynamodb_table_name($params);
+
+        // 分類算一次，log 與例外共用——兩邊各算一次除了浪費，也留下「哪天其中
+        // 一邊被改掉」的縫。
+        $category = AwsFailureCategory::of($e);
+
+        $this->_log_aws_error($operation, $e, $table, $category);
+
+        return match ($category) {
+            AwsFailureCategory::Expected => DynamoDbConditionFailed::during($operation, $e, $table, $category),
+            AwsFailureCategory::Transient => DynamoDbUnavailable::during($operation, $e, $table, $category),
+            AwsFailureCategory::Defect => DynamoDbRequestRejected::during($operation, $e, $table, $category),
+        };
+    }
+
+    /**
+     * 把 CredentialsException 翻譯成本套件的型別，並確保留下 log。
+     *
+     * 兩條路都走這裡：沒有重試迴圈的四個方法（getIterator／queryBatchItem／
+     * putBatchItem／queryScan）用 $attempts = 1；六個帶重試迴圈的方法在迴圈
+     * 跑完後帶入實際嘗試次數。
+     *
+     * 統一走同一個入口是刻意的——1.40.0 之前憑證耗盡是唯一「拋了例外卻沒有任何
+     * library log」的路徑，若讓兩邊各自處理，很容易又漏掉一邊。
+     *
+     * @return AwsOperationException 由呼叫端 throw
+     */
+    private function _translate_credentials_error(
+        string $operation,
+        ?\Aws\Exception\CredentialsException $e,
+        array $params = [],
+        int $attempts = 1,
+    ): AwsOperationException {
+        $table = $this->_dynamodb_table_name($params);
+
+        // 憑證問題屬 exogenous、可重試，標籤取自 AwsFailureCategory 而非寫死字串——
+        // 寫死的話，哪天改標籤就只會漏掉憑證這條路徑。
+        $this->_write_aws_log(
+            'error',
+            sprintf(
+                'Aws_lib::%s AWS %s%s: CredentialsException（已嘗試 %d 次）- %s',
+                $operation,
+                AwsFailureCategory::Transient->label(),
+                AwsMessageFormat::tableSuffix($table),
+                $attempts,
+                $e?->getMessage() ?? 'n/a'
+            )
+        );
+
+        return AwsCredentialsUnavailable::afterRetries($operation, $attempts, $e, $table);
+    }
+
+    /**
+     * 從 DynamoDB 參數取出表名。單筆操作是 TableName；批次操作（batchGetItem／
+     * BatchWriteItem）的表名是 RequestItems 的 key，可能多張。
+     *
+     * 表名一律來自設定檔或常數，不是使用者輸入，但仍做兩件防護：
+     *   1. 去掉控制字元——換行會讓一行 log 被偽造成兩行
+     *   2. 截斷過長字串——批次操作若帶數十張表，會讓每一行 log 與每個例外訊息
+     *      都拖上幾百個字元
+     */
+    private function _dynamodb_table_name(array $params): ?string
+    {
+        // 用 isset 而非 !empty：表名 '0' 是合法的，!empty('0') 為 false 會被誤判成沒有表名。
+        if (isset($params['TableName']) && is_string($params['TableName'])) {
+            $name = $params['TableName'];
+        } elseif (isset($params['RequestItems']) && is_array($params['RequestItems'])) {
+            $name = implode(',', array_keys($params['RequestItems']));
+        } else {
+            return null;
+        }
+
+        $name = preg_replace('/[\x00-\x1F\x7F]/', '', $name) ?? '';
+
+        if ($name === '') {
+            return null;
+        }
+
+        return mb_strlen($name) > 120 ? mb_substr($name, 0, 117) . '...' : $name;
     }
 }
 // END Aws_lib Class
