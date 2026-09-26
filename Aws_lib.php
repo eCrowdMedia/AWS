@@ -25,6 +25,7 @@ use GuzzleHttp\Exception\RequestException;
 
 use Ecrowdmedia\Aws\Exception\AwsCredentialsUnavailable;
 use Ecrowdmedia\Aws\Exception\AwsFailureCategory;
+use Ecrowdmedia\Aws\Exception\AwsMessageFormat;
 use Ecrowdmedia\Aws\Exception\AwsOperationException;
 use Ecrowdmedia\Aws\Exception\DynamoDbConditionFailed;
 use Ecrowdmedia\Aws\Exception\DynamoDbRequestRejected;
@@ -1661,7 +1662,7 @@ class Aws_lib
      * 實測 DynamoDb/S3/Ses/Sqs/CloudFront/CloudFrontKeyValueStore/Batch 皆繼承之，
      * 且都有 getAwsErrorCode()／isConnectionError()），而非 DynamoDbException——本檔
      * 另有約 37 處其他服務的 catch 同樣完全沒有儀表，將來要一併補 log 時不必再改簽章。
-     * （1.39.13 仍只處理 DynamoDB 那 10 處，其餘服務的行為未變動。）
+     * （1.40.0 仍只處理 DynamoDB 那 10 處，其餘服務的行為未變動。）
      *
      * 分類邏輯已抽到 AwsFailureCategory（Aws_exceptions.php），讓 log 標籤與
      * _translate_dynamodb_error() 翻譯出來的例外型別共用同一份判斷，避免出現
@@ -1676,10 +1677,15 @@ class Aws_lib
      * @param AwsException $e
      * @param string|null $table    DynamoDB 表名（若可得），補進訊息便於排查
      */
-    private function _log_aws_error(string $operation, AwsException $e, ?string $table = null): void
-    {
+    private function _log_aws_error(
+        string $operation,
+        AwsException $e,
+        ?string $table = null,
+        ?AwsFailureCategory $category = null,
+    ): void {
         $code = (string) $e->getAwsErrorCode();
-        $category = AwsFailureCategory::of($e);
+        // 呼叫端已經算過分類時傳進來，避免對同一個例外重複算
+        $category ??= AwsFailureCategory::of($e);
 
         $this->_write_aws_log(
             $category->logLevel(),
@@ -1687,7 +1693,7 @@ class Aws_lib
                 'Aws_lib::%s AWS %s%s: %s',
                 $operation,
                 $category->label(),
-                $table === null ? '' : ' [table=' . $table . ']',
+                AwsMessageFormat::tableSuffix($table),
                 $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
             )
         );
@@ -1733,14 +1739,16 @@ class Aws_lib
     ): AwsOperationException {
         $table = $this->_dynamodb_table_name($params);
 
-        // 分類與訊息標籤沿用 _log_aws_error 的同一份邏輯（AwsFailureCategory），
-        // 避免 log 寫「暫時性失敗」卻翻譯成 DynamoDbRequestRejected 這種不一致。
-        $this->_log_aws_error($operation, $e, $table);
+        // 分類算一次，log 與例外共用——兩邊各算一次除了浪費，也留下「哪天其中
+        // 一邊被改掉」的縫。
+        $category = AwsFailureCategory::of($e);
 
-        return match (AwsFailureCategory::of($e)) {
-            AwsFailureCategory::Expected => DynamoDbConditionFailed::during($operation, $e, $table),
-            AwsFailureCategory::Transient => DynamoDbUnavailable::during($operation, $e, $table),
-            AwsFailureCategory::Defect => DynamoDbRequestRejected::during($operation, $e, $table),
+        $this->_log_aws_error($operation, $e, $table, $category);
+
+        return match ($category) {
+            AwsFailureCategory::Expected => DynamoDbConditionFailed::during($operation, $e, $table, $category),
+            AwsFailureCategory::Transient => DynamoDbUnavailable::during($operation, $e, $table, $category),
+            AwsFailureCategory::Defect => DynamoDbRequestRejected::during($operation, $e, $table, $category),
         };
     }
 
@@ -1764,13 +1772,15 @@ class Aws_lib
     ): AwsOperationException {
         $table = $this->_dynamodb_table_name($params);
 
-        // 憑證問題屬 exogenous、可重試，標籤與 AwsFailureCategory::Transient 一致。
+        // 憑證問題屬 exogenous、可重試，標籤取自 AwsFailureCategory 而非寫死字串——
+        // 寫死的話，哪天改標籤就只會漏掉憑證這條路徑。
         $this->_write_aws_log(
             'error',
             sprintf(
-                'Aws_lib::%s AWS 暫時性失敗（可重試）%s: CredentialsException（已嘗試 %d 次）- %s',
+                'Aws_lib::%s AWS %s%s: CredentialsException（已嘗試 %d 次）- %s',
                 $operation,
-                $table === null ? '' : ' [table=' . $table . ']',
+                AwsFailureCategory::Transient->label(),
+                AwsMessageFormat::tableSuffix($table),
                 $attempts,
                 $e?->getMessage() ?? 'n/a'
             )

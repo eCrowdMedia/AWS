@@ -14,7 +14,13 @@ parameters:
         - Aws_exceptions.php
 
     # 本套件是 CodeIgniter 3 library，執行期依賴框架提供的全域函式與常數。
-    # 獨立分析時看不到它們，這些不是本套件的缺陷。
-    ignoreErrors:
-        - identifier: constant.notFound
-        - identifier: function.notFound
+    #
+    # ⚠️ 刻意用逐一列舉的 bootstrap 而非
+    # `ignoreErrors: [identifier: function.notFound]`——後者會讓任何拼錯的
+    # 全域函式靜默通過（log_message 打成 log_mesage 要到正式環境才 fatal）。
+    # bootstrap 只放行確實存在於 CI 的那幾個，其餘未知函式仍會被攔下。
+    #
+    # 用 bootstrapFiles 而非 stubFiles：bootstrap 會被實際執行，define() 出來的
+    # 常數與 function 宣告因此真的存在；stubFiles 不處理常數。
+    bootstrapFiles:
+        - phpstan-bootstrap.php

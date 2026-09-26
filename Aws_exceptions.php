@@ -14,7 +14,7 @@
  *   sentinel，並把「這是什麼錯／該不該重試／該不該當成查無資料」的判斷責任
  *   推給每一個呼叫端。實務結果是同一段守衛被貼到十餘處、卻有六種不同的善後，
  *   且 ValidationException（我們自己的 bug）會被靜默當成「查無資料」。
- *   1.39.13 改為翻譯後上拋，回到「要嘛給你 Result、要嘛拋例外」的契約。
+ *   1.40.0 改為翻譯後上拋，回到「要嘛給你 Result、要嘛拋例外」的契約。
  *
  * 載入方式：本套件型別為 codeigniter-library，安裝時整個目錄被複製到 CI 的
  * libraries 路徑下、不在 vendor/ 內，因此**沒有 PSR-4 autoload**可用。
@@ -99,8 +99,36 @@ enum AwsFailureCategory: string
         'InternalFailure',
         'ServiceUnavailable',
         'RequestTimeout',
-        // ↓ DynamoDB control-plane 並發限制，AWS 文件明確標示可重試
-        'LimitExceededException',
+        // ↓ DynamoDB 專屬，依 AWS「Error handling with DynamoDB」的
+        //   「OK to retry? Yes」欄位
+        'LimitExceededException',            // control-plane 並發限制
+        'ReplicatedWriteConflictException',  // MRSC global table 跨區改同一筆
+        // ↓ 交易併發衝突。單筆 putItem／updateItem／deleteItem 撞上同一筆 item
+        //   正在進行的交易時會回這個（AWS 另有 TransactionConflict 這個
+        //   CloudWatch metric），屬暫時性、退避後重試即可。
+        'TransactionConflictException',
+        // ↓ 同一個 ClientRequestToken 的交易已在進行中。AWS 的建議處理方式
+        //   正是「讓 client 重試以觸發原請求完成」，但需留 5 秒以上間隔。
+        'TransactionInProgressException',
+    ];
+
+    /**
+     * 刻意**不**收的可重試碼。
+     *
+     * AWS 文件把 `ItemCollectionSizeLimitExceededException` 標成「OK to retry? Yes」，
+     * 但那是 LSI 下同一個 partition key 的 item collection 超過 10 GB —— 重試不會
+     * 讓它變小，屬資料模型問題。歸進 Transient 會讓它被當成「等一下就好」而被忽略，
+     * 留在 Defect 反而會被看見。
+     *
+     * `TransactionCanceledException` 的可重試性要看 CancellationReasons 內每一筆的
+     * Code（TransactionConflict 可重試、ConditionalCheckFailed 不可），本層不解析
+     * 那個結構。需要區分的呼叫端請檢查 getPrevious()。
+     *
+     * @var array<int, string>
+     */
+    public const DELIBERATELY_NOT_TRANSIENT = [
+        'ItemCollectionSizeLimitExceededException',
+        'TransactionCanceledException',
     ];
 
     /**
@@ -135,9 +163,7 @@ enum AwsFailureCategory: string
             return self::Transient;
         }
 
-        // 已知限制：TransactionCanceledException 的可重試性要看 CancellationReasons
-        // 裡每一筆的 Code（TransactionConflict 可重試、ConditionalCheckFailed 不可），
-        // 本層不解析那個結構。需要區分的呼叫端請自行檢查 getPrevious()。
+        // 刻意不歸進 Transient 的碼與理由見 DELIBERATELY_NOT_TRANSIENT。
         return self::Defect;
     }
 
@@ -165,6 +191,20 @@ enum AwsFailureCategory: string
             self::Expected => 'info',
             self::Transient, self::Defect => 'error',
         };
+    }
+}
+
+/**
+ * 訊息格式的單一來源。
+ *
+ * `[table=...]` 這個後綴原本在四處各寫一份（_log_aws_error、
+ * _translate_credentials_error、during、afterRetries），改格式時很容易漏改。
+ */
+final class AwsMessageFormat
+{
+    public static function tableSuffix(?string $table): string
+    {
+        return $table === null || $table === '' ? '' : ' [table=' . $table . ']';
     }
 }
 
@@ -204,8 +244,12 @@ abstract class AwsOperationException extends \RuntimeException implements AwsOpe
      * 後者要同時服務 S3／SES 等約 37 處尚未收攏的 catch，故兩邊的標籤
      * 前綴不同，其餘（operation、table、error code、原訊息）一致。
      */
-    public static function during(string $operation, AwsException $e, ?string $table = null): static
-    {
+    public static function during(
+        string $operation,
+        AwsException $e,
+        ?string $table = null,
+        ?AwsFailureCategory $category = null,
+    ): static {
         $code = (string) $e->getAwsErrorCode();
 
         return new static(
@@ -213,8 +257,9 @@ abstract class AwsOperationException extends \RuntimeException implements AwsOpe
                 'Aws_lib::%s %s %s%s: %s',
                 $operation,
                 static::SERVICE,
-                AwsFailureCategory::of($e)->label(),
-                $table === null ? '' : ' [table=' . $table . ']',
+                // 呼叫端已經算過分類時傳進來，避免對同一個例外重複算三次
+                ($category ?? AwsFailureCategory::of($e))->label(),
+                AwsMessageFormat::tableSuffix($table),
                 $code !== '' ? $code . ' - ' . $e->getMessage() : $e->getMessage()
             ),
             $operation,
@@ -298,7 +343,7 @@ final class AwsCredentialsUnavailable extends AwsOperationException implements R
                 'Aws_lib::%s 無法取得 AWS 憑證（已嘗試 %d 次）%s: %s',
                 $operation,
                 $attempts,
-                $table === null ? '' : ' [table=' . $table . ']',
+                AwsMessageFormat::tableSuffix($table),
                 $previous?->getMessage() ?? 'CredentialsException'
             ),
             $operation,
